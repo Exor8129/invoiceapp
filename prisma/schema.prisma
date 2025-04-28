@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Party {
+  id               Int     @id @default(autoincrement())
+  name             String
+  address          String?
+  code             Int?
+  contact          String?
+  credit           Float?
+  dlno             String?
+  gst              String?
+  state            String?
+  type             String?
+  shipping_address String?
+  credit_period    String?
+}
+
+model Courier {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+}
+
+model Department {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+}
+
+model Item {
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  hsn    Int?
+  min    Int?
+  rate   Float?
+  tax    Float?
+  vendor String?
+}
+
+model inRegister {
+  id         Int      @id @default(autoincrement())
+  regNo      Int      @unique
+  party      String?
+  item       String?
+  qty        Int
+  department String?
+  deptRef    String?
+  remark     String?
+  others     String?
+  courier    String?
+  complete   String?  @default("Open")
+  date       DateTime
+}
