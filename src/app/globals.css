@@ -21,3 +21,30 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #printable-invoice,
+  #printable-invoice * {
+    visibility: visible !important;
+  }
+
+  #printable-invoice {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 794px; /* A4 size */
+    height: 1123px;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: transparent !important;
+    background-image: url('/invoice-template.png') !important;
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+    background-position: top left !important;
+    z-index: 9999;
+  }
+}
+

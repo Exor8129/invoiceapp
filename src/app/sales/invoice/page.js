@@ -6,6 +6,8 @@ import { useState, useEffect, useRef } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
+import ReactToPrint from "react-to-print";
+import PrintableInvoice from "@/app/components/PrintableInvoice";
 
 export default function CreateInvoicePage() {
   const [invoiceItems, setInvoiceItems] = useState([]);
@@ -80,8 +82,8 @@ export default function CreateInvoicePage() {
       setInvoiceItems([...invoiceItems, itemToAdd]);
     }
 
-    console.log("Item Added:", itemToAdd);
-    console.log("Updated Invoice Items:", [...invoiceItems, itemToAdd]);
+    // console.log("Item Added:", itemToAdd);
+    // console.log("Updated Invoice Items:", [...invoiceItems, itemToAdd]);
 
     setCurrentItem({ name: "", qty: "", rate: "", hsn: "", tax: "", mrp: "" });
   };
@@ -133,85 +135,119 @@ export default function CreateInvoicePage() {
 
   const taxSummary = [];
 
-invoiceItems.forEach(item => {
-  const taxRate = item.tax;
-  const taxableValue = item.rate * item.qty;
-  const existing = taxSummary.find(t => t.taxRate === taxRate);
+  invoiceItems.forEach((item) => {
+    const taxRate = item.tax;
+    const taxableValue = item.rate * item.qty;
+    const existing = taxSummary.find((t) => t.taxRate === taxRate);
 
-  if (existing) {
-    existing.taxableValue += taxableValue;
-  } else {
-    taxSummary.push({
-      taxRate,
-      hsn: item.hsn,
-      taxableValue,
-    });
-  }
-});
+    if (existing) {
+      existing.taxableValue += taxableValue;
+    } else {
+      taxSummary.push({
+        taxRate,
+        hsn: item.hsn,
+        taxableValue,
+      });
+    }
+  });
 
-// Sort by taxRate (ascending)
-taxSummary.sort((a, b) => a.taxRate - b.taxRate);
+  // Sort by taxRate (ascending)
+  taxSummary.sort((a, b) => a.taxRate - b.taxRate);
 
-// Add calculated CGST/SGST
-taxSummary.forEach(t => {
-  const taxAmount = (t.taxableValue * t.taxRate) / 100;
-  t.cgst = taxAmount / 2;
-  t.sgst = taxAmount / 2;
-  t.totalTax = taxAmount;
-});
+  // Add calculated CGST/SGST
+  taxSummary.forEach((t) => {
+    const taxAmount = (t.taxableValue * t.taxRate) / 100;
+    t.cgst = taxAmount / 2;
+    t.sgst = taxAmount / 2;
+    t.totalTax = taxAmount;
+  });
 
-
-function numberToWordsIndian(num) {
-  const ones = [
-    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen',
-    'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
-  ];
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-  const scales = ['', 'Thousand', 'Lakh', 'Crore'];
-
-  function getWords(n) {
-    if (n === 0) return '';
-    if (n < 20) return ones[n];
-    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
-    if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + getWords(n % 100) : '');
-
-    let result = '';
-    const parts = [
-      { divisor: 10000000, label: 'Crore' },
-      { divisor: 100000, label: 'Lakh' },
-      { divisor: 1000, label: 'Thousand' },
-      { divisor: 100, label: 'Hundred' }
+  function numberToWordsIndian(num) {
+    const ones = [
+      "",
+      "One",
+      "Two",
+      "Three",
+      "Four",
+      "Five",
+      "Six",
+      "Seven",
+      "Eight",
+      "Nine",
+      "Ten",
+      "Eleven",
+      "Twelve",
+      "Thirteen",
+      "Fourteen",
+      "Fifteen",
+      "Sixteen",
+      "Seventeen",
+      "Eighteen",
+      "Nineteen",
     ];
+    const tens = [
+      "",
+      "",
+      "Twenty",
+      "Thirty",
+      "Forty",
+      "Fifty",
+      "Sixty",
+      "Seventy",
+      "Eighty",
+      "Ninety",
+    ];
+    const scales = ["", "Thousand", "Lakh", "Crore"];
 
-    for (const part of parts) {
-      if (n >= part.divisor) {
-        const quotient = Math.floor(n / part.divisor);
-        result += getWords(quotient) + ' ' + part.label + ' ';
-        n %= part.divisor;
+    function getWords(n) {
+      if (n === 0) return "";
+      if (n < 20) return ones[n];
+      if (n < 100)
+        return (
+          tens[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + ones[n % 10] : "")
+        );
+      if (n < 1000)
+        return (
+          ones[Math.floor(n / 100)] +
+          " Hundred" +
+          (n % 100 !== 0 ? " and " + getWords(n % 100) : "")
+        );
+
+      let result = "";
+      const parts = [
+        { divisor: 10000000, label: "Crore" },
+        { divisor: 100000, label: "Lakh" },
+        { divisor: 1000, label: "Thousand" },
+        { divisor: 100, label: "Hundred" },
+      ];
+
+      for (const part of parts) {
+        if (n >= part.divisor) {
+          const quotient = Math.floor(n / part.divisor);
+          result += getWords(quotient) + " " + part.label + " ";
+          n %= part.divisor;
+        }
       }
+
+      if (n > 0) result += getWords(n);
+      return result.trim();
     }
 
-    if (n > 0) result += getWords(n);
-    return result.trim();
-  }
+    const [rupees, paise] = num.toFixed(2).split(".").map(Number);
 
-  const [rupees, paise] = num.toFixed(2).split('.').map(Number);
+    let words = "";
+    if (rupees > 0) {
+      words += getWords(rupees) + " Rupees";
+    }
+    if (paise > 0) {
+      words += (rupees > 0 ? " and " : "") + getWords(paise) + " Paise";
+    }
+    if (!words) {
+      words = "Zero Rupees";
+    }
 
-  let words = '';
-  if (rupees > 0) {
-    words += getWords(rupees) + ' Rupees';
+    return words + " Only";
   }
-  if (paise > 0) {
-    words += (rupees > 0 ? ' and ' : '') + getWords(paise) + ' Paise';
-  }
-  if (!words) {
-    words = 'Zero Rupees';
-  }
-
-  return words + ' Only';
-}
-
 
   const total = invoiceItems.reduce(
     (acc, item) => acc + item.qty * item.rate,
@@ -219,49 +255,86 @@ function numberToWordsIndian(num) {
   );
   const taxAmount = invoiceItems.reduce(
     (acc, item) => acc + (item.qty * item.rate * item.tax) / 100,
-    0);
- 
+    0
+  );
+
   const grandTotal = total + taxAmount;
   const roundOff = Math.round(grandTotal) - grandTotal;
   const finalTotal = Math.round(grandTotal);
   const totalInWords = numberToWordsIndian(finalTotal);
 
   const handleSaveInvoice = async () => {
-    const payload = {
-      date: invoiceDate, // e.g., new Date().toISOString()
-      partyName: selectedPartyName,
-      invoiceNumber: invoiceNo,
-      items: invoiceItems.map((item) => ({
-        name: item.name,
-        qty: item.qty,
-        rate: item.rate,
-        profit: item.profit ?? 0,
-      })),
-    };
-  
-    try {
-      const res = await fetch('/api/sale-entry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-  
-      const data = await res.json();
-  
-      if (data.success) {
-        alert('Invoice saved successfully!');
-      } else {
-        console.error(data.error);
-        alert('Failed to save invoice.');
-      }
-    } catch (err) {
-      console.error('Error saving invoice:', err);
-      alert('Something went wrong!');
+    const printableContent = document.getElementById("printable-invoice");
+    if (!printableContent) {
+      console.error("Printable content not found");
+      return;
     }
-  };
+
+    const printWindow = window.open("", "", "width=800,height=1000");
+    if (!printWindow) {
+      alert("Popup blocked. Please allow popups and try again.");
+      return;
+    }
+
+    const pngImageUrl = "/HeaderPNG.png"; // Must be in the 'public' folder
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Invoice</title>
+          <style>
+            html, body {
+              margin: 0;
+              padding: 0;
+              height: 100%;
+              background-image: url('${pngImageUrl}');
+              background-size: cover;
+              background-repeat: no-repeat;
+              background-position: top center;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
   
+            .content {
+              position: relative;
+              z-index: 10;
+              padding: 40px; /* Adjust as needed */
+              font-family: Arial, sans-serif;
+            }
+  
+            @media print {
+              html, body {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                background-image: url('${pngImageUrl}') !important;
+                background-size: cover !important;
+                background-repeat: no-repeat !important;
+                background-position: top center !important;
+              }
+  
+              .content {
+                position: relative;
+                z-index: 10;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="content">
+            ${printableContent.innerHTML}
+          </div>
+        </body>
+      </html>
+    `);
 
+    printWindow.document.close();
 
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    };
+  };
 
   return (
     <div className="flex flex-col md:flex-row gap-6 p-6 min-h-screen bg-gray-50">
@@ -578,97 +651,368 @@ function numberToWordsIndian(num) {
         </div>
 
         <div className="grid grid-cols-2 gap-4 mt-6">
-      <div className="text-sm leading-relaxed border border-gray-300 p-4 rounded-md">
-        <strong>Declaration:</strong>
-        <p className="mt-1 ml-2">
-          We declare that this invoice shows the actual price of the goods
-          described and that all particulars are true and correct.
-        </p>
-        <p className="mt-4 font-semibold">Rupees in Words:</p>
-        <p className="ml-2 italic">{totalInWords}</p>
-      </div>
+          <div className="text-sm leading-relaxed border border-gray-300 p-4 rounded-md">
+            <strong>Declaration:</strong>
+            <p className="mt-1 ml-2">
+              We declare that this invoice shows the actual price of the goods
+              described and that all particulars are true and correct.
+            </p>
+            <p className="mt-4 font-semibold">Rupees in Words:</p>
+            <p className="ml-2 italic">{totalInWords}</p>
+          </div>
 
-      <div className="border border-gray-300 rounded-md p-4 text-sm">
-        <div className="flex justify-between py-1 border-b">
-          <span>Total</span>
-          <span>{total.toFixed(2)}</span>
+          <div className="border border-gray-300 rounded-md p-4 text-sm">
+            <div className="flex justify-between py-1 border-b">
+              <span>Total</span>
+              <span>{total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b">
+              <span>SGST</span>
+              <span>{(taxAmount / 2).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b">
+              <span>CGST</span>
+              <span>{(taxAmount / 2).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b">
+              <span>Round Off</span>
+              <span>{roundOff.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-base py-1">
+              <span>Grand Total</span>
+              <span>{finalTotal.toFixed(2)}</span>
+            </div>
+          </div>
         </div>
-        <div className="flex justify-between py-1 border-b">
-          <span>SGST</span>
-          <span>{(taxAmount / 2).toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between py-1 border-b">
-          <span>CGST</span>
-          <span>{(taxAmount / 2).toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between py-1 border-b">
-          <span>Round Off</span>
-          <span>{roundOff.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between font-semibold text-base py-1">
-          <span>Grand Total</span>
-          <span>{finalTotal.toFixed(2)}</span>
-        </div>
-      </div>
-    </div>
-        
-        
 
         <div className="mt-10 border border-gray-300 rounded">
-  <div className="overflow-x-auto">
-    <table className="w-full text-sm text-left border-t border-gray-300">
-      <thead className="bg-gray-100">
-        <tr className="text-gray-700">
-          <th className="border p-2">Tax</th>
-          <th className="border p-2">HSN/SAC</th>
-          <th className="border p-2">Taxable Value</th>
-          <th className="border p-2">Central Tax Rate</th>
-          <th className="border p-2">Central Tax Amount</th>
-          <th className="border p-2">State Tax Rate</th>
-          <th className="border p-2">State Tax Amount</th>
-          <th className="border p-2">Total Tax Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        {taxSummary.map((t, idx) => (
-          <tr key={idx}>
-            <td className="border p-2">{t.taxRate}%</td>
-            <td className="border p-2">{t.hsn}</td>
-            <td className="border p-2">{t.taxableValue.toFixed(2)}</td>
-            <td className="border p-2">{(t.taxRate / 2).toFixed(2)}%</td>
-            <td className="border p-2">{t.cgst.toFixed(2)}</td>
-            <td className="border p-2">{(t.taxRate / 2).toFixed(2)}%</td>
-            <td className="border p-2">{t.sgst.toFixed(2)}</td>
-            <td className="border p-2">{t.totalTax.toFixed(2)}</td>
-          </tr>
-        ))}
-      </tbody>
-      <tfoot>
-        <tr className="font-semibold">
-          <td className="border p-2 text-right" colSpan={2}>Total</td>
-          <td className="border p-2">
-            {taxSummary.reduce((sum, t) => sum + t.taxableValue, 0).toFixed(2)}
-          </td>
-          <td className="border p-2"></td>
-          <td className="border p-2">
-            {taxSummary.reduce((sum, t) => sum + t.cgst, 0).toFixed(2)}
-          </td>
-          <td className="border p-2"></td>
-          <td className="border p-2">
-            {taxSummary.reduce((sum, t) => sum + t.sgst, 0).toFixed(2)}
-          </td>
-          <td className="border p-2">
-            {taxSummary.reduce((sum, t) => sum + t.totalTax, 0).toFixed(2)}
-          </td>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
-</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left border-t border-gray-300">
+              <thead className="bg-gray-100">
+                <tr className="text-gray-700">
+                  <th className="border p-2">Tax</th>
+                  <th className="border p-2">HSN/SAC</th>
+                  <th className="border p-2">Taxable Value</th>
+                  <th className="border p-2">Central Tax Rate</th>
+                  <th className="border p-2">Central Tax Amount</th>
+                  <th className="border p-2">State Tax Rate</th>
+                  <th className="border p-2">State Tax Amount</th>
+                  <th className="border p-2">Total Tax Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {taxSummary.map((t, idx) => (
+                  <tr key={idx}>
+                    <td className="border p-2">{t.taxRate}%</td>
+                    <td className="border p-2">{t.hsn}</td>
+                    <td className="border p-2">{t.taxableValue.toFixed(2)}</td>
+                    <td className="border p-2">
+                      {(t.taxRate / 2).toFixed(2)}%
+                    </td>
+                    <td className="border p-2">{t.cgst.toFixed(2)}</td>
+                    <td className="border p-2">
+                      {(t.taxRate / 2).toFixed(2)}%
+                    </td>
+                    <td className="border p-2">{t.sgst.toFixed(2)}</td>
+                    <td className="border p-2">{t.totalTax.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-semibold">
+                  <td className="border p-2 text-right" colSpan={2}>
+                    Total
+                  </td>
+                  <td className="border p-2">
+                    {taxSummary
+                      .reduce((sum, t) => sum + t.taxableValue, 0)
+                      .toFixed(2)}
+                  </td>
+                  <td className="border p-2"></td>
+                  <td className="border p-2">
+                    {taxSummary.reduce((sum, t) => sum + t.cgst, 0).toFixed(2)}
+                  </td>
+                  <td className="border p-2"></td>
+                  <td className="border p-2">
+                    {taxSummary.reduce((sum, t) => sum + t.sgst, 0).toFixed(2)}
+                  </td>
+                  <td className="border p-2">
+                    {taxSummary
+                      .reduce((sum, t) => sum + t.totalTax, 0)
+                      .toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
 
-        
         <Button onClick={handleSaveInvoice}>Save Invoice</Button>
+      </div>
 
+      {/* For Printing Block */}
+      <div
+        id="printable-invoice"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "794px", // A4 width in px
+          height: "1123px", // A4 height in px
+          zIndex: 9999,
+          backgroundImage: "url('/invoice-template.png')",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "cover",
+          backgroundPosition: "top left",
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+          display: "none",
+        }}
+        className="print:block"
+      >
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+          }}
+        >
+          {/* Example: Party Name */}
+          <div
+            style={{
+              position: "absolute",
+              top: "135px",
+              left: "10px",
+              fontSize: "14px",
+              fontWeight: "500",
+              maxWidth: "200px", // or any suitable width
+              whiteSpace: "normal", // allows wrapping
+              wordWrap: "break-word", // breaks long words if needed
+            }}
+          >
+            {partyName}
+          </div>
+
+          {/* Example: Bill Address */}
+          <div
+            style={{
+              position: "absolute",
+              top: "200px",
+              left: "10px",
+              fontSize: "14px",
+              fontWeight: "500",
+              maxWidth: "195px", // or any suitable width
+              whiteSpace: "normal", // allows wrapping
+              wordWrap: "break-word", // breaks long words if needed
+            }}
+          >
+            {selectedParty?.address}
+          </div>
+
+          {/* Example: GSTIN */}
+          <div
+            style={{
+              position: "absolute",
+              top: "135px",
+              left: "220px",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            {selectedParty?.gst}
+          </div>
+
+          {/* Example: Phone Number */}
+          <div
+            style={{
+              position: "absolute",
+              top: "320px",
+              left: "10px",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            PH: {selectedParty?.contact || "N/A"}
+          </div>
+
+          {/* Example: State */}
+          <div
+            style={{
+              position: "absolute",
+              top: "260px",
+              left: "440px",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            {selectedParty?.state || "N/A"}
+          </div>
+
+          {/* Example: State Code */}
+          <div
+            style={{
+              position: "absolute",
+              top: "260px",
+              left: "570px",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            {selectedParty?.code || "N/A"}
+          </div>
+
+          {/* Example: Shipping Address */}
+          <div
+            style={{
+              position: "absolute",
+              top: "260px",
+              left: "220px",
+              fontSize: "14px",
+              fontWeight: "500",
+              maxWidth: "200px", // or any suitable width
+              whiteSpace: "normal", // allows wrapping
+              wordWrap: "break-word", // breaks long words if needed
+            }}
+          >
+            {selectedShippingAddress}
+          </div>
+
+          {/* Example: Invoice Date */}
+          <div
+            style={{
+              position: "absolute",
+              top: "140px",
+              left: "560px",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            {format(selectedDate, "dd-MM-yyyy")}
+          </div>
+
+          {invoiceItems.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                position: "absolute",
+                top: `${410 + idx * 55}px`, // Adjust Y-spacing per row
+                left: "-15px", // Starting X position
+                display: "flex",
+                width: "664px", // Total row width
+                fontSize: "12px",
+                fontWeight: "500",
+                height: "55px",
+                borderLeft: "1px solid #dddddd",
+                borderRight: "1px solid #dddddd",
+                borderBottom: "1px solid #dddddd",
+              }}
+            >
+              {/* SL No */}
+              <div
+                style={{
+                  width: "42px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "1px solid #dddddd",
+                }}
+              >
+                {idx + 1}
+              </div>{" "}
+              {/* Item Name */}
+              <div
+                style={{
+                  width: "227px",
+                  padding: "10px 4px",
+                  borderRight: "1px solid #dddddd",
+                }}
+              >
+                {item.name}
+              </div>{" "}
+              {/* HSN */}
+              <div
+                style={{
+                  width: "65px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "1px solid #dddddd",
+                  fontSize: "12px",
+                }}
+              >
+                {item.hsn || ""}
+              </div>{" "}
+              {/* Tax */}
+              <div
+                style={{
+                  width: "32px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "1px solid #dddddd",
+                  fontSize: "12px",
+                }}
+              >
+                {item.tax || ""}%
+              </div>{" "}
+              {/* MRP */}
+              <div
+                style={{
+                  width: "42px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "1px solid #dddddd",
+                }}
+              >
+                1250 {/* {item.mrp || ""} */}
+              </div>{" "}
+              {/* Disc */}
+              <div
+                style={{
+                  width: "45px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "1px solid #dddddd",
+                  fontSize: "12px",
+                }}
+              >
+                20%{/* {item.disc || ""} */}
+              </div>{" "}
+              {/* Qty */}
+              <div
+                style={{
+                  width: "58px",
+                  borderRight: "1px solid #dddddd",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                }}
+              >
+                {item.qty}
+              </div>{" "}
+              {/* Rate */}
+              <div
+                style={{
+                  width: "56px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "0.01px solid #dddddd",
+                }}
+              >
+                {item.rate}
+              </div>{" "}
+              {/* Amount */}
+              <div style={{ width: "80px", alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex", }}>
+                {(item.qty * item.rate).toFixed(2)}
+              </div>{" "}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
