@@ -13,6 +13,10 @@ import {
   ChevronRight,
   StickyNote,
   Receipt,
+  BookText,
+  ChartColumnStacked,
+  Notebook,
+  BookHeart,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -71,6 +75,29 @@ export default function Sidebar() {
       label: 'Accounting',
       key: '/accounting',
       icon: <Banknote size={18} />,
+      children:[
+        {label: 'Mini Ledger',
+          key: '/accounting/miniledger',
+          icon: <BookText size={16} />,},
+
+          {label: 'Aeging Repor>',
+          key: '/accounting/aeging',
+          icon: <ChartColumnStacked size={16} />,}
+      ],
+    },
+    {
+      label: 'Purchase',
+      key: '/purchase',
+      icon: <Notebook size={18} />,
+      children:[
+        {label: 'Upload Files',
+          key: '/purchase/helper',
+          icon: <BookHeart size={16} />,},
+
+          {label: 'Purchase Helper',
+          key: '/purchase/purchaseorder',
+          icon: <ChartColumnStacked size={16} />,}
+      ],
     },
   ];
 

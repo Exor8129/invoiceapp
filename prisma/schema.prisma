@@ -20,6 +20,8 @@ model Party {
   type             String?
   shipping_address String?
   credit_period    String?
+
+  pricingRules CustomerPricingRule[] @relation("PartyToPricingRules")
 }
 
 model Courier {
@@ -33,14 +35,16 @@ model Department {
 }
 
 model Item {
-  id     Int     @id @default(autoincrement())
-  name   String  @unique
+  id     Int      @id @default(autoincrement())
+  name   String   @unique
   hsn    Int?
   min    Int?
   rate   Float?
   tax    Float?
   vendor String?
-  mrp    Float?
+  mrp    Decimal? @db.Decimal(10, 2)
+
+   pricingRules CustomerPricingRule[] @relation("ItemToPricingRules")
 }
 
 model inRegister {
@@ -58,13 +62,96 @@ model inRegister {
   date       DateTime
 }
 
-model sale_entry {
-  id             Int      @id @default(autoincrement())
-  date           Date
-  party_name     String
-  invoice_number String
-  item_name      String
+model saleEntry {
+  id             Int      @id(map: "sale_entry_pkey") @default(autoincrement())
+  date           DateTime @db.Date
+  party_name     String   @db.VarChar(255)
+  invoice_number String   @db.VarChar(100)
+  item_name      String   @db.VarChar(255)
   quantity       Int
-  sell_rate      Decimal  @db.Numeric(10, 2)
-  profit         Decimal? @db.Numeric(10, 2)
+  sell_rate      Decimal  @db.Decimal(10, 2)
+  profit         Decimal? @db.Decimal(10, 2)
+}
+
+
+
+model SalesByItem {
+  id       Int      @id @default(autoincrement())
+  date     DateTime @db.Timestamp(6)
+  itemname String
+  qty      Int
+
+  @@map("salesbyitem")
+}
+
+model SaleData2425 {
+  party_name   String?
+  invoice_date DateTime? @db.Date
+  invoice_no   String?
+  item_name    String?
+  quantity     Int?
+  rate         Decimal? 
+  uid          String?
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  @@map("saledata2425")
+}
+
+model StockItem {
+  id          Int     @id @default(autoincrement())
+  uid         String  @unique
+  name        String
+  hsncode     String?
+  buyingprice Float
+  supplier    String?
+  tax         Float?
+  stock       Int
+
+  // Only relation name here, no fields/references
+  permanentItem PermanentItem? @relation("ItemToPermanent")
+  @@map("stockitem")
+}
+
+model PermanentItem {
+  id            Int      @id @default(autoincrement())
+  uid           String   @unique
+  name          String?
+  reorder_level Int?
+  product_note  String?
+  supplier      String?
+  udrl          String?      // <-- newly added column
+
+  // Full relation details only on this side
+  stockItem     StockItem @relation("ItemToPermanent", fields: [uid], references: [uid], onDelete: Cascade, onUpdate: Cascade)
+@@map("permanentitem")
+}
+
+
+model saleTempEntry{
+  id Int @id @default(autoincrement())
+  partyname String?
+  invcdt DateTime?
+  itemName String?
+  disc String?
+  qty Float?
+  rate Float?
+  shpAdd String?
+
+  @@map("saleTempEntry")
+}
+
+model CustomerPricingRule {
+  id             Int      @id @default(autoincrement())
+  party_id       Int
+  item_id        Int
+  min_qty        Int?
+  fixed_price    Decimal  @db.Decimal(10, 2)
+  effective_from DateTime @default(now()) @db.Date
+  effective_to   DateTime? @db.Date
+
+  // Relations
+  item  Item  @relation("ItemToPricingRules", fields: [item_id], references: [id], onDelete: Cascade)
+  party Party @relation("PartyToPricingRules", fields: [party_id], references: [id], onDelete: Cascade)
+
+  @@unique([party_id, item_id, min_qty])
 }

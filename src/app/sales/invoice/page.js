@@ -1,13 +1,15 @@
 "use client";
 
-import { Button, Select } from "antd";
+import { Button, Select, Switch, Table, message } from "antd";
 import { PenIcon, Trash } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
+import { toast } from "react-toastify";
 import ReactToPrint from "react-to-print";
 import PrintableInvoice from "@/app/components/PrintableInvoice";
+import Search from "antd/es/input/Search";
 
 export default function CreateInvoicePage() {
   const [invoiceItems, setInvoiceItems] = useState([]);
@@ -27,6 +29,64 @@ export default function CreateInvoicePage() {
   const [showPicker, setShowPicker] = useState(false);
   const [isPOEditing, setIsPOEditing] = useState(false);
   const [poNumber, setPoNumber] = useState("N/A");
+  const [offsetValue, setOffsetValue] = useState("N/A");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isNewView, setIsNewView] = useState(false);
+  const [searchTerm,setSearchTerm]=useState("");  
+  
+
+//Temporary Code Area starts Here
+const columns = [
+  {
+    title: "Invoice No",
+    dataIndex: "invoiceNo",
+    key: "invoiceNo",
+  },
+  {
+    title: "Party Name",
+    dataIndex: "partyName",
+    key: "partyName",
+  },
+  {
+    title: "Date",
+    dataIndex: "date",
+    key: "date",
+  },
+  {
+    title: "Amount",
+    dataIndex: "amount",
+    key: "amount",
+  },
+];
+
+const dummyData = [
+  {
+    key: "1",
+    invoiceNo: "INV001",
+    partyName: "ABC Medicals",
+    date: "2025-05-24",
+    amount: "₹15,000",
+  },
+  {
+    key: "2",
+    invoiceNo: "INV002",
+    partyName: "XYZ Pharma",
+    date: "2025-05-23",
+    amount: "₹22,500",
+  },
+  // Add more rows as needed
+];
+
+
+
+//Temporary Code Area ends Here
+
+
+
+const dataFiltered=dummyData.filter((item)=>
+item.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase())||
+item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handlePOChange = (e) => {
     setPoNumber(e.target.value);
@@ -36,6 +96,22 @@ export default function CreateInvoicePage() {
     setSelectedDate(date);
     setShowPicker(false);
   };
+
+  const fetchInvoiceNumber = async () => {
+    try {
+      const res = await fetch("/api/invoice/next-number");
+      const data = await res.json();
+      console.log("New Invoice Number:", data.invoiceNumber); // 🐞 DEBUG
+      setInvoiceNumber(data.invoiceNumber);
+    } catch (err) {
+      toast.error("❌ Failed to fetch invoice number");
+      console.error("Invoice fetch failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvoiceNumber();
+  }, []);
 
   useEffect(() => {
     const fetchParties = async () => {
@@ -52,7 +128,7 @@ export default function CreateInvoicePage() {
     const fetchItems = async () => {
       const res = await fetch("/api/items");
       const data = await res.json();
-      console.log("Fetched Item Details", data);
+      // console.log("Fetched Item Details", data);
       setItemOptions(data);
     };
     fetchItems();
@@ -73,20 +149,36 @@ export default function CreateInvoicePage() {
       mrp: selectedItem?.mrp ?? null,
     };
 
-    if (editIndex !== null) {
-      const updatedItems = [...invoiceItems];
-      updatedItems[editIndex] = itemToAdd;
-      setInvoiceItems(updatedItems);
-      setEditIndex(null);
-    } else {
-      setInvoiceItems([...invoiceItems, itemToAdd]);
+    let updatedItems;
+
+    // Check for duplicate (based on item name)
+    const isDuplicate = invoiceItems.some(
+      (item, index) => item.name === itemToAdd.name && index !== editIndex
+    );
+
+    if (isDuplicate) {
+      toast.error("❌ Item already added!");
+      return;
     }
 
-    // console.log("Item Added:", itemToAdd);
-    // console.log("Updated Invoice Items:", [...invoiceItems, itemToAdd]);
+    if (editIndex !== null) {
+      updatedItems = [...invoiceItems];
+      updatedItems[editIndex] = itemToAdd;
+    } else {
+      updatedItems = [...invoiceItems, itemToAdd];
+    }
+
+    // Compute local offset based on the previous state
+    const offset = 385 + updatedItems.length * 55;
+    toast.success(`✅ Item added successfully! ${offset}`);
+
+    // Update state
+    setInvoiceItems(updatedItems);
+    setEditIndex(null);
 
     setCurrentItem({ name: "", qty: "", rate: "", hsn: "", tax: "", mrp: "" });
   };
+
   const handleDeleteItem = (index) => {
     const updatedItems = invoiceItems.filter((_, i) => i !== index);
     setInvoiceItems(updatedItems);
@@ -263,22 +355,34 @@ export default function CreateInvoicePage() {
   const finalTotal = Math.round(grandTotal);
   const totalInWords = numberToWordsIndian(finalTotal);
 
-  const handleSaveInvoice = async () => {
+ const handleSaveInvoice = async () => {
     const printableContent = document.getElementById("printable-invoice");
     if (!printableContent) {
       console.error("Printable content not found");
       return;
     }
 
-    const printWindow = window.open("", "", "width=800,height=1000");
+    const printWindow = window.open("", "_blank", "width=800,height=1000");
     if (!printWindow) {
       alert("Popup blocked. Please allow popups and try again.");
       return;
     }
 
-    const pngImageUrl = "/HeaderPNG.png"; // Must be in the 'public' folder
+    const headerImageUrl = "/HeaderPNG1.png"; // top background
+    const footerImageUrl = "/FooterPNG.png"; // second image (positioned lower)
 
-    printWindow.document.write(`
+    // Count how many .invoice-item elements exist
+    const itemCount = printableContent.querySelectorAll(".invoice-item").length;
+
+    // Adjust position of second image based on item count
+    const checkValue = 385 + itemCount * 55;
+    const offset = 880; // fine-tune this as needed
+
+    // Determine if footer should move to the next page
+    const footerPosition = checkValue > offset ? checkValue + 700 : offset; // Adjust footer position if needed
+
+    const htmlContent = `
+      <!DOCTYPE html>
       <html>
         <head>
           <title>Invoice</title>
@@ -287,34 +391,39 @@ export default function CreateInvoicePage() {
               margin: 0;
               padding: 0;
               height: 100%;
-              background-image: url('${pngImageUrl}');
+              font-family: Arial, sans-serif;
+              background-image: url('${headerImageUrl}');
               background-size: cover;
               background-repeat: no-repeat;
               background-position: top center;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
   
             .content {
               position: relative;
               z-index: 10;
-              padding: 40px; /* Adjust as needed */
-              font-family: Arial, sans-serif;
+              padding: 40px;
+            }
+  
+            .footer-image {
+              position: absolute;
+              left: 10px;
+              top: ${footerPosition}px;
+              width: 774px;
             }
   
             @media print {
               html, body {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                background-image: url('${pngImageUrl}') !important;
+                background-image: url('${headerImageUrl}') !important;
                 background-size: cover !important;
                 background-repeat: no-repeat !important;
                 background-position: top center !important;
               }
   
-              .content {
-                position: relative;
-                z-index: 10;
+              /* Trigger page break if the footer position exceeds the page limit */
+              .footer-image {
+                page-break-before: always; /* Ensure footer is pushed to a new page if needed */
               }
             }
           </style>
@@ -322,11 +431,14 @@ export default function CreateInvoicePage() {
         <body>
           <div class="content">
             ${printableContent.innerHTML}
+            <img class="footer-image" src="${footerImageUrl}" />
           </div>
         </body>
       </html>
-    `);
+    `;
 
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
     printWindow.document.close();
 
     printWindow.onload = () => {
@@ -336,151 +448,276 @@ export default function CreateInvoicePage() {
     };
   };
 
+
+  // Function to reset the form fields
+  const resetFields = () => {
+    // fetchInvoiceNumber();
+    setPartyName(""); // Reset party name
+    setSelectedDate(null); // Reset selected date
+    setPoNumber(""); // Reset PO number
+    setSelectedShippingAddress(""); // Reset shipping address
+    setInvoiceItems([]); // Clear the invoice items list
+  };
+
+  const handleSave = async () => {
+    if (
+      !invoiceNumber ||
+      !partyName ||
+      !selectedDate ||
+      invoiceItems.length === 0
+    ) {
+      toast.error("❌ Please complete all invoice details.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    const invoicePayload = {
+      invoiceNumber,
+      partyName,
+      invoiceDate: selectedDate.toISOString(),
+      poNumber,
+      poDate: selectedDate.toISOString(),
+      shippingAddress: selectedShippingAddress || "",
+      items: invoiceItems.map((item) => ({
+        name: item.name,
+        hsn: item.hsn,
+        tax: item.tax,
+        qty: item.qty,
+        rate: item.rate,
+        total: (item.rate * (1 + item.tax / 100) * item.qty).toFixed(2),
+      })),
+      totals: {
+        total,
+        sgst: taxAmount / 2,
+        cgst: taxAmount / 2,
+        roundOff,
+        grandTotal: finalTotal,
+      },
+      summary: taxSummary,
+    };
+
+    try {
+      const res = await fetch("/api/saleEntry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invoicePayload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success("✅ Invoice saved successfully.");
+
+        try {
+          resetFields();
+          console.log("✅ resetFields succeeded");
+
+          await fetchInvoiceNumber();
+          console.log("✅ fetchInvoiceNumber succeeded");
+        } catch (innerErr) {
+          console.error("❌ Post-save error:", innerErr);
+          toast.error(
+            "⚠️ Invoice saved, but failed to reset form or fetch new invoice number."
+          );
+        }
+      } else {
+        toast.error(
+          `❌ Error saving invoice: ${data.message || "Unknown error"}`
+        );
+      }
+    } catch (err) {
+      toast.error("❌ Failed to save invoice. Please try again.");
+      console.error("Save error:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col md:flex-row gap-6 p-6 min-h-screen bg-gray-50">
+    <div className="flex md:flex-row flex-col gap-4 h-[calc(100vh-100px)]">
       {/* Input Section */}
-      <div className="md:w-1/2 bg-white shadow rounded-2xl p-6 space-y-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">
-          Create New Invoice
-        </h2>
 
-        {/* Party Selector */}
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-gray-700">
-            Party Name
-          </label>
-          <Select
-            showSearch
-            placeholder="Select Party"
-            optionFilterProp="children"
-            className="w-full"
-            value={partyName}
-            onChange={handlePartyChange}
-            filterOption={(input, option) =>
-              option.children.toLowerCase().includes(input.toLowerCase())
-            }
-          >
-            {partyOptions.map((party) => (
-              <Select.Option key={party.id} value={party.name}>
-                {party.name}
-              </Select.Option>
-            ))}
-          </Select>
+      {isNewView ? (
+        <div className="md:w-1/2 bg-white shadow rounded-2xl p-6 space-y-6 overflow-y-auto h-full">
+          <div className="mb-4 flex items-center gap-3">
+            <Switch
+              checked={isNewView}
+              onChange={() => setIsNewView(!isNewView)}
+            />
+            <span className="text-gray-700 font-medium">
+              {isNewView ? "Go To New Invoice" : "Click to Show Slips & Saved Invoices"}
+            </span>
+          </div>
+          {/* Slip and Saved Bill Section */}
+          <Search
+            className="mb-4"
+            placeholder="Search By Party Name/Slip Number"
+            onChange={(e)=>setSearchTerm(e.target.value)}
+
+          />
+          <Table
+          columns={columns}
+          dataSource={dataFiltered}
+          pagination={{pageSize:5}}
+          />
+          
         </div>
+      ) : (
+        <div className="md:w-1/2 bg-white shadow rounded-2xl p-6 space-y-6 overflow-y-auto h-full">
+          <div className="mb-4 flex items-center gap-3">
+            <Switch
+              checked={isNewView}
+              onChange={() => setIsNewView(!isNewView)}
+            />
+            <span className="text-gray-700 font-medium">
+              {isNewView ? "Go To New Invoice " : "Click to Show Slips & Saved Invoices"}
+            </span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">
+            Create New Invoice
+          </h2>
 
-        {/* Add Item */}
-        <div className="grid grid-cols-3 gap-4">
+          {/* Party Selector */}
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-gray-700">
-              Item
+              Party Name
             </label>
             <Select
               showSearch
-              placeholder="Select Item"
+              placeholder="Select Party"
+              optionFilterProp="children"
               className="w-full"
-              value={currentItem.name}
-              onChange={(value) =>
-                setCurrentItem({ ...currentItem, name: value })
-              }
+              value={partyName}
+              onChange={handlePartyChange}
               filterOption={(input, option) =>
                 option.children.toLowerCase().includes(input.toLowerCase())
               }
             >
-              {itemOptions.map((item) => (
-                <Select.Option key={item.id} value={item.name}>
-                  {item.name}
+              {partyOptions.map((party) => (
+                <Select.Option key={party.id} value={party.name}>
+                  {party.name}
                 </Select.Option>
               ))}
             </Select>
           </div>
+
+          {/* Add Item */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Item
+              </label>
+              <Select
+                showSearch
+                placeholder="Select Item"
+                className="w-full"
+                value={currentItem.name}
+                onChange={(value) =>
+                  setCurrentItem({ ...currentItem, name: value })
+                }
+                filterOption={(input, option) =>
+                  option.children.toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {itemOptions.map((item) => (
+                  <Select.Option key={item.id} value={item.name}>
+                    {item.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Qty
+              </label>
+              <input
+                type="number"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                value={currentItem.qty}
+                onChange={(e) =>
+                  setCurrentItem({ ...currentItem, qty: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Rate
+              </label>
+              <input
+                type="number"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                value={currentItem.rate}
+                onChange={(e) =>
+                  setCurrentItem({ ...currentItem, rate: e.target.value })
+                }
+              />
+            </div>
+          </div>
+
+          {/* Add Item Button */}
+          <button
+            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+            onClick={handleAddItem}
+          >
+            {editIndex !== null ? "Update Item" : "Add Item"}
+          </button>
+
+          {/* Shipping Address Selector */}
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-gray-700">
-              Qty
+              Shipping Address
             </label>
-            <input
-              type="number"
-              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-400 focus:outline-none"
-              value={currentItem.qty}
-              onChange={(e) =>
-                setCurrentItem({ ...currentItem, qty: e.target.value })
-              }
-            />
+            {shippingAddresses.length > 0 && (
+              <Select
+                className="w-full"
+                value={selectedShippingAddress}
+                onChange={(value) => setSelectedShippingAddress(value)}
+              >
+                {shippingAddresses.map((addrObj, index) => (
+                  <Select.Option key={index} value={addrObj.address}>
+                    <div className="flex justify-between items-center">
+                      <span>{addrObj.address}</span>
+                      {addrObj.isPrimary && (
+                        <span className="text-yellow-500 ml-2">⭐</span>
+                      )}
+                    </div>
+                  </Select.Option>
+                ))}
+              </Select>
+            )}
+
+            {selectedShippingAddress === "Same as Billing Address" && (
+              <div className="mt-2 p-2 bg-green-100 text-green-800 rounded text-center text-sm">
+                Shipping Address same as Billing Address
+              </div>
+            )}
           </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">
-              Rate
-            </label>
-            <input
-              type="number"
-              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-400 focus:outline-none"
-              value={currentItem.rate}
-              onChange={(e) =>
-                setCurrentItem({ ...currentItem, rate: e.target.value })
-              }
-            />
+
+          {/* Credit Period */}
+          <div className="p-3 bg-blue-50 border border-blue-300 rounded-lg text-center text-sm font-semibold text-blue-800">
+            Credit Period:{" "}
+            {selectedParty ? selectedParty.credit_period || "N/A" : "N/A"} Days
           </div>
-        </div>
 
-        {/* Add Item Button */}
-        <button
-          className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
-          onClick={handleAddItem}
-        >
-          {editIndex !== null ? "Update Item" : "Add Item"}
-        </button>
-
-        {/* Shipping Address Selector */}
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-gray-700">
-            Shipping Address
-          </label>
-          {shippingAddresses.length > 0 && (
-            <Select
-              className="w-full"
-              value={selectedShippingAddress}
-              onChange={(value) => setSelectedShippingAddress(value)}
-            >
-              {shippingAddresses.map((addrObj, index) => (
-                <Select.Option key={index} value={addrObj.address}>
-                  <div className="flex justify-between items-center">
-                    <span>{addrObj.address}</span>
-                    {addrObj.isPrimary && (
-                      <span className="text-yellow-500 ml-2">⭐</span>
-                    )}
-                  </div>
-                </Select.Option>
-              ))}
-            </Select>
-          )}
-
-          {selectedShippingAddress === "Same as Billing Address" && (
-            <div className="mt-2 p-2 bg-green-100 text-green-800 rounded text-center text-sm">
-              Shipping Address same as Billing Address
+          {/* Current Item Quick Info */}
+          {currentItem.name && (
+            <div className="p-3 bg-blue-50 border border-blue-300 rounded-lg text-sm space-y-1">
+              <p>
+                <strong>Quantity:</strong> {currentItem.qty}
+              </p>
+              <p>
+                <strong>Rate:</strong> ₹{currentItem.rate}
+              </p>
             </div>
           )}
         </div>
-
-        {/* Credit Period */}
-        <div className="p-3 bg-blue-50 border border-blue-300 rounded-lg text-center text-sm font-semibold text-blue-800">
-          Credit Period:{" "}
-          {selectedParty ? selectedParty.credit_period || "N/A" : "N/A"} Days
-        </div>
-
-        {/* Current Item Quick Info */}
-        {currentItem.name && (
-          <div className="p-3 bg-blue-50 border border-blue-300 rounded-lg text-sm space-y-1">
-            <p>
-              <strong>Quantity:</strong> {currentItem.qty}
-            </p>
-            <p>
-              <strong>Rate:</strong> ₹{currentItem.rate}
-            </p>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Preview Section */}
-      <div className="md:w-1/2 bg-white shadow rounded-xl p-6 space-y-6">
+      <div className="md:w-1/2 bg-white shadow rounded-xl p-6 space-y-6 overflow-y-auto h-full">
         <h2 className="text-2xl font-bold mb-6 text-gray-800">
           Invoice Preview
         </h2>
@@ -491,7 +728,7 @@ export default function CreateInvoicePage() {
             <div>
               <p className="text-black-600">
                 <span className="text-gray-600 font-semibold">
-                  Invoice Number:
+                  Invoice Number: {invoiceNumber || "N/A"}
                 </span>
               </p>
               <p className="text-black-600">
@@ -747,7 +984,10 @@ export default function CreateInvoicePage() {
           </div>
         </div>
 
-        <Button onClick={handleSaveInvoice}>Save Invoice</Button>
+        <Button onClick={handleSaveInvoice}>Print Invoice</Button>
+        <Button onClick={handleSave} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save Invoice"}
+        </Button>
       </div>
 
       {/* For Printing Block */}
@@ -760,7 +1000,7 @@ export default function CreateInvoicePage() {
           width: "794px", // A4 width in px
           height: "1123px", // A4 height in px
           zIndex: 9999,
-          backgroundImage: "url('/invoice-template.png')",
+          backgroundImage: "url('/HeaderPNG1.png')",
           backgroundRepeat: "no-repeat",
           backgroundSize: "cover",
           backgroundPosition: "top left",
@@ -781,8 +1021,8 @@ export default function CreateInvoicePage() {
           <div
             style={{
               position: "absolute",
-              top: "135px",
-              left: "10px",
+              top: "112px",
+              left: "0px",
               fontSize: "14px",
               fontWeight: "500",
               maxWidth: "200px", // or any suitable width
@@ -797,9 +1037,9 @@ export default function CreateInvoicePage() {
           <div
             style={{
               position: "absolute",
-              top: "200px",
-              left: "10px",
-              fontSize: "14px",
+              top: "155px",
+              left: "0px",
+              fontSize: "12px",
               fontWeight: "500",
               maxWidth: "195px", // or any suitable width
               whiteSpace: "normal", // allows wrapping
@@ -813,8 +1053,8 @@ export default function CreateInvoicePage() {
           <div
             style={{
               position: "absolute",
-              top: "135px",
-              left: "220px",
+              top: "110px",
+              left: "250px",
               fontSize: "14px",
               fontWeight: "500",
             }}
@@ -826,8 +1066,8 @@ export default function CreateInvoicePage() {
           <div
             style={{
               position: "absolute",
-              top: "320px",
-              left: "10px",
+              top: "250px",
+              left: "0px",
               fontSize: "14px",
               fontWeight: "500",
             }}
@@ -839,8 +1079,8 @@ export default function CreateInvoicePage() {
           <div
             style={{
               position: "absolute",
-              top: "260px",
-              left: "440px",
+              top: "200px",
+              left: "510px",
               fontSize: "14px",
               fontWeight: "500",
             }}
@@ -852,8 +1092,8 @@ export default function CreateInvoicePage() {
           <div
             style={{
               position: "absolute",
-              top: "260px",
-              left: "570px",
+              top: "200px",
+              left: "650px",
               fontSize: "14px",
               fontWeight: "500",
             }}
@@ -865,9 +1105,9 @@ export default function CreateInvoicePage() {
           <div
             style={{
               position: "absolute",
-              top: "260px",
-              left: "220px",
-              fontSize: "14px",
+              top: "205px",
+              left: "250px",
+              fontSize: "12px",
               fontWeight: "500",
               maxWidth: "200px", // or any suitable width
               whiteSpace: "normal", // allows wrapping
@@ -881,8 +1121,8 @@ export default function CreateInvoicePage() {
           <div
             style={{
               position: "absolute",
-              top: "140px",
-              left: "560px",
+              top: "110px",
+              left: "630px",
               fontSize: "14px",
               fontWeight: "500",
             }}
@@ -895,79 +1135,16 @@ export default function CreateInvoicePage() {
               key={idx}
               style={{
                 position: "absolute",
-                top: `${410 + idx * 55}px`, // Adjust Y-spacing per row
-                left: "-15px", // Starting X position
+                top: `${335 + idx * 55}px`,
+                left: "-30px",
                 display: "flex",
-                width: "664px", // Total row width
+                width: "774px",
                 fontSize: "12px",
                 fontWeight: "500",
                 height: "55px",
-                borderLeft: "1px solid #dddddd",
-                borderRight: "1px solid #dddddd",
                 borderBottom: "1px solid #dddddd",
               }}
             >
-              {/* SL No */}
-              <div
-                style={{
-                  width: "42px",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  display: "flex",
-                  borderRight: "1px solid #dddddd",
-                }}
-              >
-                {idx + 1}
-              </div>{" "}
-              {/* Item Name */}
-              <div
-                style={{
-                  width: "227px",
-                  padding: "10px 4px",
-                  borderRight: "1px solid #dddddd",
-                }}
-              >
-                {item.name}
-              </div>{" "}
-              {/* HSN */}
-              <div
-                style={{
-                  width: "65px",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  display: "flex",
-                  borderRight: "1px solid #dddddd",
-                  fontSize: "12px",
-                }}
-              >
-                {item.hsn || ""}
-              </div>{" "}
-              {/* Tax */}
-              <div
-                style={{
-                  width: "32px",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  display: "flex",
-                  borderRight: "1px solid #dddddd",
-                  fontSize: "12px",
-                }}
-              >
-                {item.tax || ""}%
-              </div>{" "}
-              {/* MRP */}
-              <div
-                style={{
-                  width: "42px",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  display: "flex",
-                  borderRight: "1px solid #dddddd",
-                }}
-              >
-                1250 {/* {item.mrp || ""} */}
-              </div>{" "}
-              {/* Disc */}
               <div
                 style={{
                   width: "45px",
@@ -975,15 +1152,66 @@ export default function CreateInvoicePage() {
                   justifyContent: "center",
                   display: "flex",
                   borderRight: "1px solid #dddddd",
-                  fontSize: "12px",
                 }}
               >
-                20%{/* {item.disc || ""} */}
-              </div>{" "}
-              {/* Qty */}
+                {idx + 1}
+              </div>
               <div
                 style={{
-                  width: "58px",
+                  width: "300px",
+                  padding: "10px 4px",
+                  borderRight: "1px solid #dddddd",
+                }}
+              >
+                {item.name}
+              </div>
+              <div
+                style={{
+                  width: "74px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "1px solid #dddddd",
+                }}
+              >
+                {item.hsn || ""}
+              </div>
+              <div
+                style={{
+                  width: "36px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "1px solid #dddddd",
+                }}
+              >
+                {item.tax || ""}%
+              </div>
+              <div
+                style={{
+                  width: "45px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "1px solid #dddddd",
+                }}
+              >
+                1250
+              </div>
+              <div
+                style={{
+                  width: "50px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  borderRight: "1px solid #dddddd",
+                }}
+              >
+                20%
+              </div>
+              <div
+                style={{
+                  width: "62px",
                   borderRight: "1px solid #dddddd",
                   alignItems: "center",
                   justifyContent: "center",
@@ -991,11 +1219,10 @@ export default function CreateInvoicePage() {
                 }}
               >
                 {item.qty}
-              </div>{" "}
-              {/* Rate */}
+              </div>
               <div
                 style={{
-                  width: "56px",
+                  width: "62px",
                   alignItems: "center",
                   justifyContent: "center",
                   display: "flex",
@@ -1003,15 +1230,54 @@ export default function CreateInvoicePage() {
                 }}
               >
                 {item.rate}
-              </div>{" "}
-              {/* Amount */}
-              <div style={{ width: "80px", alignItems: "center",
+              </div>
+              <div
+                style={{
+                  width: "90px",
+                  alignItems: "center",
                   justifyContent: "center",
-                  display: "flex", }}>
+                  display: "flex",
+                }}
+              >
                 {(item.qty * item.rate).toFixed(2)}
-              </div>{" "}
+              </div>
             </div>
           ))}
+
+          {/* Render empty rows to ensure 9 total */}
+          {Array.from({ length: Math.max(0, 9 - invoiceItems.length) }).map(
+            (_, idx) => (
+              <div
+                key={`empty-${idx}`}
+                style={{
+                  position: "absolute",
+                  top: `${335 + (invoiceItems.length + idx) * 55}px`,
+                  left: "-30px",
+                  display: "flex",
+                  width: "774px",
+                  fontSize: "12px",
+                  fontWeight: "500",
+                  height: "55px",
+                  borderBottom: "1px solid #dddddd",
+                }}
+              >
+                {[45, 306, 74, 35, 45, 50, 60, 62, 90].map((w, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: `${w}px`,
+                      borderRight: i !== 8 ? "1px solid #dddddd" : "none",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      display: "flex",
+                    }}
+                  >
+                    &nbsp;
+                  </div>
+                ))}
+              </div>
+            )
+          )}
         </div>
       </div>
     </div>
