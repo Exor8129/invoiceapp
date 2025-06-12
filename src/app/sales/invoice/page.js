@@ -34,7 +34,6 @@ export default function CreateInvoicePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isNewView, setIsNewView] = useState(false);
   const [searchTerm,setSearchTerm]=useState("");  
-  
 
 //Temporary Code Area starts Here
 const columns = [
@@ -355,7 +354,7 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
   const finalTotal = Math.round(grandTotal);
   const totalInWords = numberToWordsIndian(finalTotal);
 
- const handleSaveInvoice = async () => {
+  const handleSaveInvoice = async () => {
     const printableContent = document.getElementById("printable-invoice");
     if (!printableContent) {
       console.error("Printable content not found");
@@ -372,15 +371,24 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
     const footerImageUrl = "/FooterPNG.png"; // second image (positioned lower)
 
     // Count how many .invoice-item elements exist
-    const itemCount = printableContent.querySelectorAll(".invoice-item").length;
+    // const itemCount = printableContent.querySelectorAll(".invoice-item").length;
+    const itemCount = invoiceItems.length;
 
     // Adjust position of second image based on item count
     const checkValue = 385 + itemCount * 55;
     const offset = 880; // fine-tune this as needed
 
     // Determine if footer should move to the next page
-    const footerPosition = checkValue > offset ? checkValue + 700 : offset; // Adjust footer position if needed
-
+    // const footerPosition = checkValue < offset ? checkValue + 540 : offset; // Adjust footer position if needed
+    let footerPosition;
+    if (checkValue>=925){
+      footerPosition = checkValue + 220;
+    }else if (checkValue < offset) {
+  footerPosition = offset;
+} else {
+  footerPosition = offset;
+}
+    toast.success(`✅ footerPosition! ${footerPosition} checkValue ${checkValue} itemCount ${itemCount} `);
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -447,7 +455,6 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
       printWindow.close();
     };
   };
-
 
   // Function to reset the form fields
   const resetFields = () => {
@@ -831,7 +838,7 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
             </div>
           </div>
         </div>
-
+                
         {/* Items Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border border-gray-200 rounded-lg">
@@ -851,7 +858,7 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
             </thead>
             <tbody>
               {invoiceItems.map((item, index) => (
-                <tr key={index} className="hover:bg-gray-50">
+                <tr key={index} className="invoice-item hover:bg-gray-50">
                   <td className="border p-3">{index + 1}</td>
                   <td className="border p-3">{item.name}</td>
                   <td className="border p-3">{item.hsn}</td>
