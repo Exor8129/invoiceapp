@@ -33,59 +33,57 @@ export default function CreateInvoicePage() {
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isNewView, setIsNewView] = useState(false);
-  const [searchTerm,setSearchTerm]=useState("");  
+  const [searchTerm, setSearchTerm] = useState("");
 
-//Temporary Code Area starts Here
-const columns = [
-  {
-    title: "Invoice No",
-    dataIndex: "invoiceNo",
-    key: "invoiceNo",
-  },
-  {
-    title: "Party Name",
-    dataIndex: "partyName",
-    key: "partyName",
-  },
-  {
-    title: "Date",
-    dataIndex: "date",
-    key: "date",
-  },
-  {
-    title: "Amount",
-    dataIndex: "amount",
-    key: "amount",
-  },
-];
+  //Temporary Code Area starts Here
+  const columns = [
+    {
+      title: "Invoice No",
+      dataIndex: "invoiceNo",
+      key: "invoiceNo",
+    },
+    {
+      title: "Party Name",
+      dataIndex: "partyName",
+      key: "partyName",
+    },
+    {
+      title: "Date",
+      dataIndex: "date",
+      key: "date",
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      key: "amount",
+    },
+  ];
 
-const dummyData = [
-  {
-    key: "1",
-    invoiceNo: "INV001",
-    partyName: "ABC Medicals",
-    date: "2025-05-24",
-    amount: "₹15,000",
-  },
-  {
-    key: "2",
-    invoiceNo: "INV002",
-    partyName: "XYZ Pharma",
-    date: "2025-05-23",
-    amount: "₹22,500",
-  },
-  // Add more rows as needed
-];
+  const dummyData = [
+    {
+      key: "1",
+      invoiceNo: "INV001",
+      partyName: "ABC Medicals",
+      date: "2025-05-24",
+      amount: "₹15,000",
+    },
+    {
+      key: "2",
+      invoiceNo: "INV002",
+      partyName: "XYZ Pharma",
+      date: "2025-05-23",
+      amount: "₹22,500",
+    },
+    // Add more rows as needed
+  ];
 
+  //Temporary Code Area ends Here
 
-
-//Temporary Code Area ends Here
-
-
-
-const dataFiltered=dummyData.filter((item)=>
-item.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase())||
-item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
+  const dataFiltered = dummyData.filter(
+    (item) =>
+      item.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.partyName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handlePOChange = (e) => {
     setPoNumber(e.target.value);
@@ -132,7 +130,7 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
     };
     fetchItems();
   }, []);
-
+  const MAX_ITEMS = 35; // upper limit
   const handleAddItem = () => {
     if (!currentItem.name || !currentItem.qty || !currentItem.rate) return;
 
@@ -140,7 +138,6 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
       (item) => item.name === currentItem.name
     );
 
-    // Merge selected item fields with current input
     const itemToAdd = {
       ...currentItem,
       hsn: selectedItem?.hsn ?? null,
@@ -148,36 +145,44 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
       mrp: selectedItem?.mrp ?? null,
     };
 
-    let updatedItems;
-
-    // Check for duplicate (based on item name)
+    // Duplicate‑name guard (ignore if we’re just editing the same row)
     const isDuplicate = invoiceItems.some(
       (item, index) => item.name === itemToAdd.name && index !== editIndex
     );
-
     if (isDuplicate) {
       toast.error("❌ Item already added!");
       return;
     }
 
-    if (editIndex !== null) {
-      updatedItems = [...invoiceItems];
-      updatedItems[editIndex] = itemToAdd;
-    } else {
-      updatedItems = [...invoiceItems, itemToAdd];
+    /** ───────────────────────────────
+     * NEW: enforce the 50‑item limit
+     *  • When editing (`editIndex !== null`) the count doesn’t change.
+     *  • When adding (`editIndex === null`) the count will grow by 1.
+     * ─────────────────────────────── */
+    const nextCount =
+      editIndex === null ? invoiceItems.length + 1 : invoiceItems.length;
+
+    if (nextCount > MAX_ITEMS) {
+      toast.error(
+        "❌ Cannot add more than 50 products. Please create a new bill."
+      );
+      return;
     }
 
-    // Compute local offset based on the previous state
+    // Build the new array
+    const updatedItems =
+      editIndex !== null
+        ? invoiceItems.map((it, i) => (i === editIndex ? itemToAdd : it))
+        : [...invoiceItems, itemToAdd];
+
+    // Compute offset and update state
     const offset = 385 + updatedItems.length * 55;
     toast.success(`✅ Item added successfully! ${offset}`);
 
-    // Update state
     setInvoiceItems(updatedItems);
     setEditIndex(null);
-
     setCurrentItem({ name: "", qty: "", rate: "", hsn: "", tax: "", mrp: "" });
   };
-
   const handleDeleteItem = (index) => {
     const updatedItems = invoiceItems.filter((_, i) => i !== index);
     setInvoiceItems(updatedItems);
@@ -374,21 +379,39 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
     // const itemCount = printableContent.querySelectorAll(".invoice-item").length;
     const itemCount = invoiceItems.length;
 
-    // Adjust position of second image based on item count
-    const checkValue = 385 + itemCount * 55;
-    const offset = 880; // fine-tune this as needed
+   // ─── tweak here if your layout ever changes ───────────────────────
+const OFFSET              =  880;   // ≤ 9 items
+const SMALL_MAX           =    9;   // inclusive
+const MEDIUM_MAX          =   14;   // inclusive
+const MID_RANGE_MAX       =   30;   // inclusive
+const MID_RANGE_POSITION  = 1150;   // 10‑14 items
+const BIG_CLAMP_MAX       =   35;   // inclusive
+const BIG_CLAMP_POSITION  = 2300;   // 31‑35 items
+const DYNAMIC_BASE        =  385;   // for dynamic formula
+const ROW_HEIGHT          =   55;   // per‑item increment
+// ──────────────────────────────────────────────────────────────────
 
-    // Determine if footer should move to the next page
-    // const footerPosition = checkValue < offset ? checkValue + 540 : offset; // Adjust footer position if needed
-    let footerPosition;
-    if (checkValue>=925){
-      footerPosition = checkValue + 220;
-    }else if (checkValue < offset) {
-  footerPosition = offset;
-} else {
-  footerPosition = offset;
+let footerPosition;
+
+if (itemCount <= SMALL_MAX) {               // 0–9
+  footerPosition = OFFSET;
+
+} else if (itemCount <= MEDIUM_MAX) {       // 10–14
+  footerPosition = MID_RANGE_POSITION;
+
+} else if (itemCount <= MID_RANGE_MAX) {    // 15–30
+  footerPosition = DYNAMIC_BASE + itemCount * ROW_HEIGHT;
+
+} else if (itemCount <= BIG_CLAMP_MAX) {    // 31–35
+  footerPosition = BIG_CLAMP_POSITION;
+
+} else {                                    // 36+
+  footerPosition = DYNAMIC_BASE + itemCount * ROW_HEIGHT;
 }
-    toast.success(`✅ footerPosition! ${footerPosition} checkValue ${checkValue} itemCount ${itemCount} `);
+
+toast.success(`footerPosition = ${footerPosition}`);
+
+    // toast.success(`✅ footerPosition! ${footerPosition} checkValue ${checkValue} itemCount ${itemCount} `);
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -555,22 +578,22 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
               onChange={() => setIsNewView(!isNewView)}
             />
             <span className="text-gray-700 font-medium">
-              {isNewView ? "Go To New Invoice" : "Click to Show Slips & Saved Invoices"}
+              {isNewView
+                ? "Go To New Invoice"
+                : "Click to Show Slips & Saved Invoices"}
             </span>
           </div>
           {/* Slip and Saved Bill Section */}
           <Search
             className="mb-4"
             placeholder="Search By Party Name/Slip Number"
-            onChange={(e)=>setSearchTerm(e.target.value)}
-
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
           <Table
-          columns={columns}
-          dataSource={dataFiltered}
-          pagination={{pageSize:5}}
+            columns={columns}
+            dataSource={dataFiltered}
+            pagination={{ pageSize: 5 }}
           />
-          
         </div>
       ) : (
         <div className="md:w-1/2 bg-white shadow rounded-2xl p-6 space-y-6 overflow-y-auto h-full">
@@ -580,7 +603,9 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
               onChange={() => setIsNewView(!isNewView)}
             />
             <span className="text-gray-700 font-medium">
-              {isNewView ? "Go To New Invoice " : "Click to Show Slips & Saved Invoices"}
+              {isNewView
+                ? "Go To New Invoice "
+                : "Click to Show Slips & Saved Invoices"}
             </span>
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-6">
@@ -838,7 +863,7 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
             </div>
           </div>
         </div>
-                
+
         {/* Items Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border border-gray-200 rounded-lg">
@@ -1285,6 +1310,28 @@ item.partyName.toLowerCase().includes(searchTerm.toLowerCase()));
               </div>
             )
           )}
+
+  {taxSummary.map((t,idx)=>(
+<div
+              key={idx}
+              style={{
+                position: "absolute",
+                top: `800px`,
+                left: "-30px",
+                display: "flex",
+                width: "774px",
+                fontSize: "12px",
+                fontWeight: "500",
+                height: "55px",
+                borderBottom: "1px solid #dddddd",
+              }}
+            >
+            {t.taxRate}%
+          </div>
+  ))}
+          
+
+          
         </div>
       </div>
     </div>
