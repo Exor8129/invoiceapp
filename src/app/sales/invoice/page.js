@@ -2,7 +2,7 @@
 
 import { Button, Select, Switch, Table, message } from "antd";
 import { PenIcon, Trash } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
@@ -35,6 +35,18 @@ export default function CreateInvoicePage() {
   const [isNewView, setIsNewView] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const calcFooterPos = (count) => {
+  if (count <= 9)  return 880;
+  if (count <= 14) return 1150;
+  if (count <= 30) return 385 + count * 55;
+  if (count <= 35) return 2300;
+  return 385 + count * 55;
+};
+
+const footerPos = useMemo(
+  () => calcFooterPos(invoiceItems.length),
+  [invoiceItems]
+);
   //Temporary Code Area starts Here
   const columns = [
     {
@@ -379,37 +391,38 @@ export default function CreateInvoicePage() {
     // const itemCount = printableContent.querySelectorAll(".invoice-item").length;
     const itemCount = invoiceItems.length;
 
-   // ─── tweak here if your layout ever changes ───────────────────────
-const OFFSET              =  880;   // ≤ 9 items
-const SMALL_MAX           =    9;   // inclusive
-const MEDIUM_MAX          =   14;   // inclusive
-const MID_RANGE_MAX       =   30;   // inclusive
-const MID_RANGE_POSITION  = 1150;   // 10‑14 items
-const BIG_CLAMP_MAX       =   35;   // inclusive
-const BIG_CLAMP_POSITION  = 2300;   // 31‑35 items
-const DYNAMIC_BASE        =  385;   // for dynamic formula
-const ROW_HEIGHT          =   55;   // per‑item increment
-// ──────────────────────────────────────────────────────────────────
+    // ─── tweak here if your layout ever changes ───────────────────────
+    const OFFSET = 880; // ≤ 9 items
+    const SMALL_MAX = 9; // inclusive
+    const MEDIUM_MAX = 14; // inclusive
+    const MID_RANGE_MAX = 30; // inclusive
+    const MID_RANGE_POSITION = 1150; // 10‑14 items
+    const BIG_CLAMP_MAX = 35; // inclusive
+    const BIG_CLAMP_POSITION = 2300; // 31‑35 items
+    const DYNAMIC_BASE = 385; // for dynamic formula
+    const ROW_HEIGHT = 55; // per‑item increment
+    // ──────────────────────────────────────────────────────────────────
 
-let footerPosition;
+    let footerPosition;
 
-if (itemCount <= SMALL_MAX) {               // 0–9
-  footerPosition = OFFSET;
-
-} else if (itemCount <= MEDIUM_MAX) {       // 10–14
-  footerPosition = MID_RANGE_POSITION;
-
-} else if (itemCount <= MID_RANGE_MAX) {    // 15–30
-  footerPosition = DYNAMIC_BASE + itemCount * ROW_HEIGHT;
-
-} else if (itemCount <= BIG_CLAMP_MAX) {    // 31–35
-  footerPosition = BIG_CLAMP_POSITION;
-
-} else {                                    // 36+
-  footerPosition = DYNAMIC_BASE + itemCount * ROW_HEIGHT;
-}
-
-toast.success(`footerPosition = ${footerPosition}`);
+    if (itemCount <= SMALL_MAX) {
+      // 0–9
+      footerPosition = OFFSET;
+    } else if (itemCount <= MEDIUM_MAX) {
+      // 10–14
+      footerPosition = MID_RANGE_POSITION;
+    } else if (itemCount <= MID_RANGE_MAX) {
+      // 15–30
+      footerPosition = DYNAMIC_BASE + itemCount * ROW_HEIGHT;
+    } else if (itemCount <= BIG_CLAMP_MAX) {
+      // 31–35
+      footerPosition = BIG_CLAMP_POSITION;
+    } else {
+      // 36+
+      footerPosition = DYNAMIC_BASE + itemCount * ROW_HEIGHT;
+    }
+      //  footerPos.current = footerPosition;
+    toast.success(`footerPosition = ${footerPosition} `);
 
     // toast.success(`✅ footerPosition! ${footerPosition} checkValue ${checkValue} itemCount ${itemCount} `);
     const htmlContent = `
@@ -1311,27 +1324,220 @@ toast.success(`footerPosition = ${footerPosition}`);
             )
           )}
 
-  {taxSummary.map((t,idx)=>(
-<div
+          {taxSummary.map((t, idx) => (
+            <div
               key={idx}
               style={{
                 position: "absolute",
-                top: `800px`,
+                top: `${(footerPos+8) + idx * 16}px`, // 55 px is the row‑height you’re already using
                 left: "-30px",
                 display: "flex",
-                width: "774px",
-                fontSize: "12px",
-                fontWeight: "500",
-                height: "55px",
-                borderBottom: "1px solid #dddddd",
+                fontSize: "10px",
+                fontWeight: 500,
               }}
             >
-            {t.taxRate}%
-          </div>
-  ))}
-          
+              {/* TAX % */}
+              <div
+                style={{
+                  width: "50px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 10,
+                }}
+              >
+                {t.taxRate}%
+              </div>
 
-          
+              {/* TAXABLE VALUE */}
+              <div
+                style={{
+                  width: "115px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-start",
+                  marginLeft: "12px",
+                  zIndex: 10,
+                }}
+              >
+                {t.taxableValue.toFixed(2)}
+              </div>
+              {/* Central Tax Rate*/}
+              <div
+                style={{
+                  width: "50px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  
+
+                  zIndex: 10,
+                }}
+              >
+                {(t.taxRate / 2).toFixed(2)}%
+              </div>
+
+              {/* CGST*/}
+              <div
+                style={{
+                  width: "75px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginLeft: "2px",
+                  zIndex: 10,
+                }}
+              >
+                {t.cgst.toFixed(2)}
+              </div>
+
+              {/* State Tax Rate*/}
+              <div
+                style={{
+                  width: "50px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+
+                  zIndex: 10,
+                }}
+              >
+                {(t.taxRate / 2).toFixed(2)}%
+              </div>
+
+              {/* SGST*/}
+              <div
+                style={{
+                  width: "70px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  // marginLeft: "2px",
+
+                  zIndex: 10,
+                }}
+              >
+                {t.sgst.toFixed(2)}
+              </div>
+
+              {/* Total Tax*/}
+              <div
+                style={{
+                  width: "120px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                 
+                  zIndex: 10,
+                }}
+              >
+                {t.totalTax.toFixed(2)}
+              </div>
+            </div>
+          ))}
+          {/* Total */}
+          <div
+            style={{
+              position: "absolute",
+              top: footerPos-35,
+              // top: "1150px",
+
+              left: "650px",
+              fontSize: "12px",
+              fontWeight: "500",
+              maxWidth: "200px", // or any suitable width
+              whiteSpace: "normal", // allows wrapping
+              wordWrap: "break-word", // breaks long words if needed
+              zIndex: 10,
+            }}
+          >
+         {taxSummary.reduce((sum, t) => sum + t.taxableValue, 0).toFixed(2)}
+          </div>
+
+          {/* CGST */}
+          <div
+            style={{
+              position: "absolute",
+              top: footerPos-12,
+              left: "650px",
+              fontSize: "12px",
+              fontWeight: "500",
+              maxWidth: "200px", // or any suitable width
+              whiteSpace: "normal", // allows wrapping
+              wordWrap: "break-word", // breaks long words if needed
+              zIndex: 10,
+            }}
+          >
+            {(taxAmount / 2).toFixed(2)}
+          </div>
+          {/* SGST */}
+          <div
+            style={{
+              position: "absolute",
+              top: footerPos+10,
+              left: "650px",
+              fontSize: "12px",
+              fontWeight: "500",
+              maxWidth: "200px", // or any suitable width
+              whiteSpace: "normal", // allows wrapping
+              wordWrap: "break-word", // breaks long words if needed
+              zIndex: 10,
+            }}
+          >
+            {(taxAmount / 2).toFixed(2)}
+          </div>
+
+          {/* Roundoff */}
+          <div
+            style={{
+              position: "absolute",
+              top: footerPos+31,
+              left: "650px",
+              fontSize: "12px",
+              fontWeight: "500",
+              maxWidth: "200px", // or any suitable width
+              whiteSpace: "normal", // allows wrapping
+              wordWrap: "break-word", // breaks long words if needed
+              zIndex: 10,
+            }}
+          >
+            {roundOff.toFixed(2)}
+          </div>
+
+          {/* Grand Total */}
+          <div
+            style={{
+              position: "absolute",
+              top: footerPos+52,
+              left: "650px",
+              fontSize: "12px",
+              fontWeight: "500",
+              maxWidth: "200px", // or any suitable width
+              whiteSpace: "normal", // allows wrapping
+              wordWrap: "break-word", // breaks long words if needed
+              zIndex: 10,
+            }}
+          >
+            {finalTotal.toFixed(2)}
+          </div>
+
+          {/* Total In Words */}
+          <div
+            style={{
+              position: "absolute",
+              top: footerPos+90,
+              left: "30px",
+              fontSize: "10px",
+              fontWeight: "500",
+              // width:"600",
+              maxWidth: "800px", // or any suitable width
+              whiteSpace: "normal", // allows wrapping
+              wordWrap: "break-word", // breaks long words if needed
+              zIndex: 10,
+            }}
+          >
+            {totalInWords}
+          </div>
         </div>
       </div>
     </div>
