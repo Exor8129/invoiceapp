@@ -17,6 +17,8 @@ import {
   ChartColumnStacked,
   Notebook,
   BookHeart,
+  FileInput,
+  Landmark,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -80,7 +82,13 @@ export default function Sidebar() {
           key: '/accounting/miniledger',
           icon: <BookText size={16} />,},
 
-          {label: 'Aeging Repor>',
+
+          {label: 'Bank Reconciliation',
+          key: '/accounting/reconciliation',
+          icon: <Landmark size={16}/>},
+          
+
+          {label: 'Aeging Repor',
           key: '/accounting/aeging',
           icon: <ChartColumnStacked size={16} />,}
       ],
@@ -90,9 +98,13 @@ export default function Sidebar() {
       key: '/purchase',
       icon: <Notebook size={18} />,
       children:[
+        {label: 'New Purchase',
+          key: '/purchase/newpurchase',
+          icon: <FileInput size={16} />,},
         {label: 'Upload Files',
           key: '/purchase/helper',
           icon: <BookHeart size={16} />,},
+          
 
           {label: 'Purchase Helper',
           key: '/purchase/purchaseorder',
