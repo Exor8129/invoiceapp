@@ -88,7 +88,7 @@ export default function Sidebar() {
           icon: <Landmark size={16}/>},
           
 
-          {label: 'Aeging Repor',
+          {label: 'Aeging Report',
           key: '/accounting/aeging',
           icon: <ChartColumnStacked size={16} />,}
       ],

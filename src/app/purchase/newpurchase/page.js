@@ -30,7 +30,7 @@ export default function CreateInvoicePage() {
   const [isPOEditing, setIsPOEditing] = useState(false);
   const [poNumber, setPoNumber] = useState("N/A");
   const [offsetValue, setOffsetValue] = useState("N/A");
-  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [purchaseNumber, setPurchaseNumber] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isNewView, setIsNewView] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -106,20 +106,19 @@ const footerPos = useMemo(
     setShowPicker(false);
   };
 
-  const fetchInvoiceNumber = async () => {
-    try {
-      const res = await fetch("/api/invoice/next-number");
-      const data = await res.json();
-      console.log("New Invoice Number:", data.invoiceNumber); // 🐞 DEBUG
-      setInvoiceNumber(data.invoiceNumber);
-    } catch (err) {
-      toast.error("❌ Failed to fetch invoice number");
-      console.error("Invoice fetch failed:", err);
-    }
-  };
-
+ const fetchPurchaseNumber = async () => {
+  try {
+    const res  = await fetch("/api/purchaseentries/next-number");   // ① new endpoint
+    const data = await res.json();
+    console.log("New Purchase Number:", data.purchaseNumber);        // 🐞 DEBUG
+    setPurchaseNumber(data.purchaseNumber);                          // ② state setter
+  } catch (err) {
+    toast.error("❌ Failed to fetch purchase number");
+    console.error("Purchase fetch failed:", err);
+  }
+};
   useEffect(() => {
-    fetchInvoiceNumber();
+    fetchPurchaseNumber();
   }, []);
 
   useEffect(() => {
@@ -541,7 +540,7 @@ const footerPos = useMemo(
     };
 
     try {
-      const res = await fetch("/api/saleEntry", {
+      const res = await fetch("/api/purchaseentries", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -558,7 +557,7 @@ const footerPos = useMemo(
           resetFields();
           console.log("✅ resetFields succeeded");
 
-          await fetchInvoiceNumber();
+          await fetchPurchaseNumber();
           console.log("✅ fetchInvoiceNumber succeeded");
         } catch (innerErr) {
           console.error("❌ Post-save error:", innerErr);
@@ -773,7 +772,7 @@ const footerPos = useMemo(
             <div>
               <p className="text-black-600">
                 <span className="text-gray-600 font-semibold">
-                  Purchase Number: {invoiceNumber || "N/A"}
+                  Purchase Number: {purchaseNumber || "N/A"}
                 </span>
               </p>
               <p className="text-black-600">
