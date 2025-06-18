@@ -26,7 +26,9 @@ export default function CreateInvoicePage() {
   const [editIndex, setEditIndex] = useState(null);
   const [shippingAddresses, setShippingAddresses] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedPODate, setSelectedPODate] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [showPOPicker, setShowPOPicker] = useState(false);
   const [isPOEditing, setIsPOEditing] = useState(false);
   const [poNumber, setPoNumber] = useState("N/A");
   const [offsetValue, setOffsetValue] = useState("N/A");
@@ -106,12 +108,17 @@ const footerPos = useMemo(
     setShowPicker(false);
   };
 
+  const handlePODateChange = (date) => {
+    setSelectedPODate(date);
+    setShowPOPicker(false);
+  };
+
  const fetchPurchaseNumber = async () => {
   try {
     const res  = await fetch("/api/purchaseentries/next-number");   // ① new endpoint
     const data = await res.json();
-    console.log("New Purchase Number:", data.purchaseNumber);        // 🐞 DEBUG
-    setPurchaseNumber(data.purchaseNumber);                          // ② state setter
+    console.log("New Purchase Number:", data.nextNumber);        // 🐞 DEBUG
+    setPurchaseNumber(data.nextNumber);                          // ② state setter
   } catch (err) {
     toast.error("❌ Failed to fetch purchase number");
     console.error("Purchase fetch failed:", err);
@@ -495,15 +502,19 @@ const footerPos = useMemo(
   const resetFields = () => {
     // fetchInvoiceNumber();
     setPartyName(""); // Reset party name
-    setSelectedDate(null); // Reset selected date
+    setSelectedDate(new Date()); // Reset selected date
     setPoNumber(""); // Reset PO number
     setSelectedShippingAddress(""); // Reset shipping address
     setInvoiceItems([]); // Clear the invoice items list
+    setSelectedParty("" );
+    setSelectedPODate(null);
+    
+    
   };
 
   const handleSave = async () => {
     if (
-      !invoiceNumber ||
+      !purchaseNumber ||
       !partyName ||
       !selectedDate ||
       invoiceItems.length === 0
@@ -515,11 +526,11 @@ const footerPos = useMemo(
     setIsSaving(true);
 
     const invoicePayload = {
-      invoiceNumber,
+      purchaseNumber,
       partyName,
       invoiceDate: selectedDate.toISOString(),
       poNumber,
-      poDate: selectedDate.toISOString(),
+      poDate: selectedDate.toISOString() || "N/A",
       shippingAddress: selectedShippingAddress || "",
       items: invoiceItems.map((item) => ({
         name: item.name,
@@ -858,11 +869,22 @@ const footerPos = useMemo(
               </p>
               <p
                 className="text-black-600 cursor-pointer"
-                onClick={() => setShowPicker(true)}
+                onClick={() => setShowPOPicker(true)}
               >
                 <span className="text-gray-600 font-semibold">PO Date:</span>{" "}
-                {format(selectedDate, "dd-MM-yyyy")}
+                {format(selectedPODate, "dd-MM-yyyy")}
               </p>
+
+              {showPOPicker && (
+                  <div className="absolute mt-2 bg-white p-2 rounded shadow-lg border z-10">
+                    <DatePicker
+                      selected={selectedPODate}
+                      onChange={handlePODateChange}
+                      inline
+                      dateFormat="dd-MM-yyyy"
+                    />
+                  </div>
+                )}
 
               {selectedShippingAddress && (
                 <p className="text-black-600">

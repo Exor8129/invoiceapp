@@ -496,7 +496,7 @@ const footerPos = useMemo(
   const resetFields = () => {
     // fetchInvoiceNumber();
     setPartyName(""); // Reset party name
-    setSelectedDate(null); // Reset selected date
+    setSelectedDate(new Date()); // Reset selected date
     setPoNumber(""); // Reset PO number
     setSelectedShippingAddress(""); // Reset shipping address
     setInvoiceItems([]); // Clear the invoice items list

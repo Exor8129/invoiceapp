@@ -35,7 +35,7 @@ export async function POST(req) {
     const rows = payload.items.map((item) => ({
       date: new Date(payload.invoiceDate),
       partyName: payload.partyName,
-      purchaseNumber: payload.invoiceNumber,
+      purchaseNumber: payload.purchaseNumber,
       itemName: item.name,
       quantity: Number(item.qty),                           // Int
       purchaseRate: new Prisma.Decimal(item.rate),          // Decimal
