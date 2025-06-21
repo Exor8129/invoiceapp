@@ -1,6 +1,16 @@
 "use client";
 
-import { Button, Select, Switch, Table, message } from "antd";
+import {
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Switch,
+  Table,
+  message,
+} from "antd";
 import { PenIcon, Trash } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import DatePicker from "react-datepicker";
@@ -36,19 +46,24 @@ export default function CreateInvoicePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isNewView, setIsNewView] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [pendingItem, setPendingItem] = useState(null); // item waiting for batch info
+  const [availabeQty, setAvailableQty]=useState("");
+  const [batchForm] = Form.useForm();
+  const [batchData, setBatchData] = useState([]);
 
   const calcFooterPos = (count) => {
-  if (count <= 9)  return 880;
-  if (count <= 14) return 1150;
-  if (count <= 30) return 385 + count * 55;
-  if (count <= 35) return 2300;
-  return 385 + count * 55;
-};
+    if (count <= 9) return 880;
+    if (count <= 14) return 1150;
+    if (count <= 30) return 385 + count * 55;
+    if (count <= 35) return 2300;
+    return 385 + count * 55;
+  };
 
-const footerPos = useMemo(
-  () => calcFooterPos(invoiceItems.length),
-  [invoiceItems]
-);
+  const footerPos = useMemo(
+    () => calcFooterPos(invoiceItems.length),
+    [invoiceItems]
+  );
   //Temporary Code Area starts Here
   const columns = [
     {
@@ -71,6 +86,15 @@ const footerPos = useMemo(
       dataIndex: "amount",
       key: "amount",
     },
+  ];
+
+    const Modalcolumns = [
+    { title: "Batch No", dataIndex: "batchNo" },
+    { title: "Serial No", dataIndex: "serialNo" },
+    { title: "Mfg Date", dataIndex: "mfgDate" },
+    { title: "Expiry Date", dataIndex: "expiryDate" },
+    { title: "Qty", dataIndex: "quantity" },
+    
   ];
 
   const dummyData = [
@@ -113,17 +137,17 @@ const footerPos = useMemo(
     setShowPOPicker(false);
   };
 
- const fetchPurchaseNumber = async () => {
-  try {
-    const res  = await fetch("/api/purchaseentries/next-number");   // ① new endpoint
-    const data = await res.json();
-    console.log("New Purchase Number:", data.nextNumber);        // 🐞 DEBUG
-    setPurchaseNumber(data.nextNumber);                          // ② state setter
-  } catch (err) {
-    toast.error("❌ Failed to fetch purchase number");
-    console.error("Purchase fetch failed:", err);
-  }
-};
+  const fetchPurchaseNumber = async () => {
+    try {
+      const res = await fetch("/api/purchaseentries/next-number"); // ① new endpoint
+      const data = await res.json();
+      console.log("New Purchase Number:", data.nextNumber); // 🐞 DEBUG
+      setPurchaseNumber(data.nextNumber); // ② state setter
+    } catch (err) {
+      toast.error("❌ Failed to fetch purchase number");
+      console.error("Purchase fetch failed:", err);
+    }
+  };
   useEffect(() => {
     fetchPurchaseNumber();
   }, []);
@@ -148,7 +172,7 @@ const footerPos = useMemo(
     };
     fetchItems();
   }, []);
-  const MAX_ITEMS = 35; // upper limit
+  const MAX_ITEMS = 50; // upper limit
   const handleAddItem = () => {
     if (!currentItem.name || !currentItem.qty || !currentItem.rate) return;
 
@@ -162,6 +186,10 @@ const footerPos = useMemo(
       tax: selectedItem?.tax ?? null,
       mrp: selectedItem?.mrp ?? null,
     };
+
+    // Instead of writing straight to invoiceItems, open modal first
+    setPendingItem(itemToAdd);
+    setBatchModalOpen(true);
 
     // Duplicate‑name guard (ignore if we’re just editing the same row)
     const isDuplicate = invoiceItems.some(
@@ -199,8 +227,29 @@ const footerPos = useMemo(
 
     setInvoiceItems(updatedItems);
     setEditIndex(null);
+    setAvailableQty(currentItem.qty);
     setCurrentItem({ name: "", qty: "", rate: "", hsn: "", tax: "", mrp: "" });
   };
+
+ const handleAddBatch = () => {
+    batchForm.validateFields().then((values) => {
+      setBatchData((prev) => [
+        ...prev,
+        {
+          ...values,
+          key: Date.now(),
+        },
+      ]);
+      batchForm.resetFields();
+    });
+  };
+
+    const handleCancel = () => {
+    batchForm.resetFields();
+    setBatchData([]);
+    setBatchModalOpen(false);
+  };
+
   const handleDeleteItem = (index) => {
     const updatedItems = invoiceItems.filter((_, i) => i !== index);
     setInvoiceItems(updatedItems);
@@ -427,7 +476,7 @@ const footerPos = useMemo(
       // 36+
       footerPosition = DYNAMIC_BASE + itemCount * ROW_HEIGHT;
     }
-      //  footerPos.current = footerPosition;
+    //  footerPos.current = footerPosition;
     toast.success(`footerPosition = ${footerPosition} `);
 
     // toast.success(`✅ footerPosition! ${footerPosition} checkValue ${checkValue} itemCount ${itemCount} `);
@@ -506,10 +555,8 @@ const footerPos = useMemo(
     setPoNumber(""); // Reset PO number
     setSelectedShippingAddress(""); // Reset shipping address
     setInvoiceItems([]); // Clear the invoice items list
-    setSelectedParty("" );
+    setSelectedParty("");
     setSelectedPODate(null);
-    
-    
   };
 
   const handleSave = async () => {
@@ -587,6 +634,9 @@ const footerPos = useMemo(
     } finally {
       setIsSaving(false);
     }
+  };
+  const AddBatchDetails = async () => {
+    console.log("Batch Details submitted");
   };
 
   return (
@@ -869,22 +919,22 @@ const footerPos = useMemo(
               </p>
               <p
                 className="text-black-600 cursor-pointer"
-                onClick={() => setShowPOPicker(true)}
+                onClick={() => setShowPOPicker((prev) => !prev)}
               >
                 <span className="text-gray-600 font-semibold">PO Date:</span>{" "}
-                {format(selectedPODate, "dd-MM-yyyy")}
+                {selectedPODate ? format(selectedPODate, "dd-MM-yyyy") : "N/A"}
               </p>
 
               {showPOPicker && (
-                  <div className="absolute mt-2 bg-white p-2 rounded shadow-lg border z-10">
-                    <DatePicker
-                      selected={selectedPODate}
-                      onChange={handlePODateChange}
-                      inline
-                      dateFormat="dd-MM-yyyy"
-                    />
-                  </div>
-                )}
+                <div className="absolute mt-2 bg-white p-2 rounded shadow-lg border z-10">
+                  <DatePicker
+                    selected={selectedPODate}
+                    onChange={handlePODateChange}
+                    inline
+                    dateFormat="dd-MM-yyyy"
+                  />
+                </div>
+              )}
 
               {selectedShippingAddress && (
                 <p className="text-black-600">
@@ -1350,7 +1400,7 @@ const footerPos = useMemo(
               key={idx}
               style={{
                 position: "absolute",
-                top: `${(footerPos+8) + idx * 16}px`, // 55 px is the row‑height you’re already using
+                top: `${footerPos + 8 + idx * 16}px`, // 55 px is the row‑height you’re already using
                 left: "-30px",
                 display: "flex",
                 fontSize: "10px",
@@ -1390,7 +1440,6 @@ const footerPos = useMemo(
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  
 
                   zIndex: 10,
                 }}
@@ -1448,7 +1497,7 @@ const footerPos = useMemo(
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                 
+
                   zIndex: 10,
                 }}
               >
@@ -1460,7 +1509,7 @@ const footerPos = useMemo(
           <div
             style={{
               position: "absolute",
-              top: footerPos-35,
+              top: footerPos - 35,
               // top: "1150px",
 
               left: "650px",
@@ -1472,14 +1521,14 @@ const footerPos = useMemo(
               zIndex: 10,
             }}
           >
-         {taxSummary.reduce((sum, t) => sum + t.taxableValue, 0).toFixed(2)}
+            {taxSummary.reduce((sum, t) => sum + t.taxableValue, 0).toFixed(2)}
           </div>
 
           {/* CGST */}
           <div
             style={{
               position: "absolute",
-              top: footerPos-12,
+              top: footerPos - 12,
               left: "650px",
               fontSize: "12px",
               fontWeight: "500",
@@ -1495,7 +1544,7 @@ const footerPos = useMemo(
           <div
             style={{
               position: "absolute",
-              top: footerPos+10,
+              top: footerPos + 10,
               left: "650px",
               fontSize: "12px",
               fontWeight: "500",
@@ -1512,7 +1561,7 @@ const footerPos = useMemo(
           <div
             style={{
               position: "absolute",
-              top: footerPos+31,
+              top: footerPos + 31,
               left: "650px",
               fontSize: "12px",
               fontWeight: "500",
@@ -1529,7 +1578,7 @@ const footerPos = useMemo(
           <div
             style={{
               position: "absolute",
-              top: footerPos+52,
+              top: footerPos + 52,
               left: "650px",
               fontSize: "12px",
               fontWeight: "500",
@@ -1546,7 +1595,7 @@ const footerPos = useMemo(
           <div
             style={{
               position: "absolute",
-              top: footerPos+90,
+              top: footerPos + 90,
               left: "30px",
               fontSize: "10px",
               fontWeight: "500",
@@ -1561,6 +1610,61 @@ const footerPos = useMemo(
           </div>
         </div>
       </div>
+
+      <Modal
+      title="Enter Batch Details"
+      open={batchModalOpen}
+      onCancel={handleCancel}
+      onOk={() => {
+        console.log("Final Data to Save:", batchData);
+        setBatchModalOpen(false);
+      }}
+      okText="Add"
+    >
+      <Form form={batchForm} layout="vertical" autoComplete="off">
+        <Form.Item>
+          <p>Available Quantity: {availabeQty}</p>
+          <p>Total Entered Quantity: </p>
+        </Form.Item>
+
+        <Form.Item name="batchNo" label="Batch No" rules={[{ required: true }]}>
+          <Input />
+        </Form.Item>
+
+        <Form.Item name="serialNo" label="Serial No">
+          <Input />
+        </Form.Item>
+
+        <Form.Item name="mfgDate" label="Mfg Date">
+          <DatePicker style={{ width: "100%" }} />
+        </Form.Item>
+
+        <Form.Item name="expiryDate" label="Expiry Date">
+          <DatePicker style={{ width: "100%" }} />
+        </Form.Item>
+
+        <Form.Item
+          name="quantity"
+          label="Quantity"
+          rules={[{ required: true, type: "number", min: 1 }]}
+        >
+          <InputNumber style={{ width: "100%" }} />
+        </Form.Item>
+
+        <Form.Item>
+          <Button type="dashed" onClick={handleAddBatch} block>
+            ➕ Add Batch Entry
+          </Button>
+        </Form.Item>
+      </Form>
+
+      <Table
+        dataSource={batchData}
+        columns={Modalcolumns}
+        size="small"
+        pagination={false}
+      />
+    </Modal>
     </div>
   );
 }

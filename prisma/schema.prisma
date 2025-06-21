@@ -43,6 +43,14 @@ model Item {
   tax    Float?
   vendor String?
   mrp    Decimal? @db.Decimal(10, 2)
+  // ─── New stock columns ────────────────────────────
+  stockIn      Int?     @map("stock-IN")
+  stockHold    Int?     @map("stock-Hold")
+  stockOut     Int?     @map("stock-Out")
+
+  /// The database keeps this up‑to‑date. Mark @ignore so Prisma
+  /// doesn’t try to write to it.
+  effectiveStock Int   @ignore @map("effective_stock")
 
   pricingRules CustomerPricingRule[] @relation("ItemToPricingRules")
 }
