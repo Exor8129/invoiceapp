@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "./node_modules/@prisma/client"
 }
 
 datasource db {
@@ -52,6 +53,7 @@ model Item {
   /// doesn’t try to write to it.
   effectiveStock Int   @ignore @map("effective_stock")
 
+  productType String? @map("productType")
   pricingRules CustomerPricingRule[] @relation("ItemToPricingRules")
 }
 

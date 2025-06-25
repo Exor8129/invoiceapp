@@ -17,11 +17,12 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
+import dayjs from "dayjs";
 import ReactToPrint from "react-to-print";
 import PrintableInvoice from "@/app/components/PrintableInvoice";
 import Search from "antd/es/input/Search";
 
-export default function CreateInvoicePage() {
+export default function CreatePurchasePage() {
   const [invoiceItems, setInvoiceItems] = useState([]);
   const [currentItem, setCurrentItem] = useState({
     name: "",
@@ -48,9 +49,12 @@ export default function CreateInvoicePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [pendingItem, setPendingItem] = useState(null); // item waiting for batch info
-  const [availabeQty, setAvailableQty]=useState("");
+  const [availabeQty, setAvailableQty] = useState("");
   const [batchForm] = Form.useForm();
   const [batchData, setBatchData] = useState([]);
+  const [productType, setProductType] = useState("");
+  const [mfgDate, setMfgDate] = useState(null);
+  const [expiryDate, setExpiryDate] = useState(null);
 
   const calcFooterPos = (count) => {
     if (count <= 9) return 880;
@@ -88,13 +92,12 @@ export default function CreateInvoicePage() {
     },
   ];
 
-    const Modalcolumns = [
+  const Modalcolumns = [
     { title: "Batch No", dataIndex: "batchNo" },
     { title: "Serial No", dataIndex: "serialNo" },
     { title: "Mfg Date", dataIndex: "mfgDate" },
     { title: "Expiry Date", dataIndex: "expiryDate" },
     { title: "Qty", dataIndex: "quantity" },
-    
   ];
 
   const dummyData = [
@@ -179,6 +182,8 @@ export default function CreateInvoicePage() {
     const selectedItem = itemOptions.find(
       (item) => item.name === currentItem.name
     );
+    console.log("Selected item:", selectedItem);
+    console.log("Selected productType:", selectedItem.productType);
 
     const itemToAdd = {
       ...currentItem,
@@ -228,23 +233,28 @@ export default function CreateInvoicePage() {
     setInvoiceItems(updatedItems);
     setEditIndex(null);
     setAvailableQty(currentItem.qty);
+    setProductType(selectedItem.productType);
     setCurrentItem({ name: "", qty: "", rate: "", hsn: "", tax: "", mrp: "" });
   };
 
  const handleAddBatch = () => {
-    batchForm.validateFields().then((values) => {
-      setBatchData((prev) => [
-        ...prev,
-        {
-          ...values,
-          key: Date.now(),
-        },
-      ]);
-      batchForm.resetFields();
-    });
-  };
+  batchForm.validateFields().then((values) => {
+    setBatchData((prev) => [
+      ...prev,
+      {
+        ...values,
+        mfgDate: mfgDate ? dayjs(mfgDate).format("DD-MM-YYYY") : "",
+        expiryDate: expiryDate ? dayjs(expiryDate).format("DD-MM-YYYY") : "",
+        key: Date.now(),
+      },
+    ]);
 
-    const handleCancel = () => {
+    batchForm.resetFields();
+    setMfgDate(null); // clear selected dates
+    setExpiryDate(null);
+  });
+};
+  const handleCancel = () => {
     batchForm.resetFields();
     setBatchData([]);
     setBatchModalOpen(false);
@@ -1612,59 +1622,94 @@ export default function CreateInvoicePage() {
       </div>
 
       <Modal
-      title="Enter Batch Details"
-      open={batchModalOpen}
-      onCancel={handleCancel}
-      onOk={() => {
-        console.log("Final Data to Save:", batchData);
-        setBatchModalOpen(false);
-      }}
-      okText="Add"
-    >
-      <Form form={batchForm} layout="vertical" autoComplete="off">
-        <Form.Item>
-          <p>Available Quantity: {availabeQty}</p>
-          <p>Total Entered Quantity: </p>
-        </Form.Item>
+        title="Enter Batch Details"
+        open={batchModalOpen}
+        onCancel={handleCancel}
+        onOk={() => {
+          const values = batchForm.getFieldsValue();
+          const formatted = {
+            ...values,
+            mfgDate: mfgDate ? dayjs(mfgDate).format("DD-MM-YYYY") : "",
+            expiryDate: expiryDate
+              ? dayjs(expiryDate).format("DD-MM-YYYY")
+              : "",
+          };
+          setBatchData((prev) => [...prev, formatted]);
+          setBatchModalOpen(false);
+          batchForm.resetFields();
+          setMfgDate(null);
+          setExpiryDate(null);
+        }}
+        okText="Add"
+      >
+        <Form form={batchForm} layout="vertical" autoComplete="off">
+          <Form.Item>
+            <p>Available Quantity: {availabeQty}</p>
+            <p>Product Type: {productType}</p>
+          </Form.Item>
 
-        <Form.Item name="batchNo" label="Batch No" rules={[{ required: true }]}>
-          <Input />
-        </Form.Item>
+          {productType?.toLowerCase() === "serial" ? (
+            <Form.Item name="serialNo" label="Serial No">
+              <Input />
+            </Form.Item>
+          ) : (
+            <Form.Item name="batchNo" label="Batch No">
+              <Input />
+            </Form.Item>
+          )}
 
-        <Form.Item name="serialNo" label="Serial No">
-          <Input />
-        </Form.Item>
+          <Form.Item
+            label="Mfg Date"
+            required
+            validateStatus={!mfgDate ? "error" : ""}
+            help={!mfgDate ? "Please select manufacturing date" : ""}
+          >
+            <DatePicker
+              selected={mfgDate}
+              onChange={(date) => setMfgDate(date)}
+              placeholderText="Please select a date"
+              dateFormat="dd-MM-yyyy"
+              className="ant-input"
+            />
+          </Form.Item>
 
-        <Form.Item name="mfgDate" label="Mfg Date">
-          <DatePicker style={{ width: "100%" }} />
-        </Form.Item>
+          <Form.Item
+            label="Expiry Date"
+            required
+            validateStatus={!expiryDate ? "error" : ""}
+            help={!expiryDate ? "Please select expiry date" : ""}
+          >
+            <DatePicker
+              selected={expiryDate}
+              onChange={(date) => setExpiryDate(date)}
+              placeholderText="Please select a date"
+              dateFormat="dd-MM-yyyy"
+              className="ant-input"
+            />
+          </Form.Item>
 
-        <Form.Item name="expiryDate" label="Expiry Date">
-          <DatePicker style={{ width: "100%" }} />
-        </Form.Item>
+          <Form.Item
+            name="quantity"
+            label="Quantity"
+            rules={[{ required: true, type: "number", min: 1 }]}
+          >
+            <InputNumber style={{ width: "100%" }} />
+          </Form.Item>
 
-        <Form.Item
-          name="quantity"
-          label="Quantity"
-          rules={[{ required: true, type: "number", min: 1 }]}
-        >
-          <InputNumber style={{ width: "100%" }} />
-        </Form.Item>
+          <Form.Item>
+            <Button type="dashed" onClick={handleAddBatch} block>
+              ➕ Add Batch Entry
+            </Button>
+          </Form.Item>
+        </Form>
 
-        <Form.Item>
-          <Button type="dashed" onClick={handleAddBatch} block>
-            ➕ Add Batch Entry
-          </Button>
-        </Form.Item>
-      </Form>
-
-      <Table
-        dataSource={batchData}
-        columns={Modalcolumns}
-        size="small"
-        pagination={false}
-      />
-    </Modal>
+        <Table
+          dataSource={batchData}
+          columns={Modalcolumns}
+          size="small"
+          pagination={false}
+        />
+      </Modal>
     </div>
   );
 }
