@@ -93,9 +93,9 @@ export default function CreatePurchasePage() {
   ];
 
   const Modalcolumns = [
-    { title: "Batch No", dataIndex: "batchNo" },
-    { title: "Serial No", dataIndex: "serialNo" },
-    { title: "Mfg Date", dataIndex: "mfgDate" },
+    { title: "Batch/SN", dataIndex: "batchNo" },
+    // { title: "Serial No", dataIndex: "serialNo" },
+    // { title: "Mfg Date", dataIndex: "mfgDate" },
     { title: "Expiry Date", dataIndex: "expiryDate" },
     { title: "Qty", dataIndex: "quantity" },
   ];
@@ -176,14 +176,73 @@ export default function CreatePurchasePage() {
     fetchItems();
   }, []);
   const MAX_ITEMS = 50; // upper limit
+  // const handleAddItem = () => {
+  //   if (!currentItem.name || !currentItem.qty || !currentItem.rate) return;
+
+  //   const selectedItem = itemOptions.find(
+  //     (item) => item.name === currentItem.name
+  //   );
+  //   console.log("Selected item:", selectedItem);
+  //   console.log("Selected productType:", selectedItem.productType);
+
+  //   const itemToAdd = {
+  //     ...currentItem,
+  //     hsn: selectedItem?.hsn ?? null,
+  //     tax: selectedItem?.tax ?? null,
+  //     mrp: selectedItem?.mrp ?? null,
+  //   };
+
+  //   // Instead of writing straight to invoiceItems, open modal first
+  //   setPendingItem(itemToAdd);
+  //   setBatchModalOpen(true);
+
+  //   // Duplicate‑name guard (ignore if we’re just editing the same row)
+  //   const isDuplicate = invoiceItems.some(
+  //     (item, index) => item.name === itemToAdd.name && index !== editIndex
+  //   );
+  //   if (isDuplicate) {
+  //     toast.error("❌ Item already added!");
+  //     return;
+  //   }
+
+  //   /** ───────────────────────────────
+  //    * NEW: enforce the 50‑item limit
+  //    *  • When editing (`editIndex !== null`) the count doesn’t change.
+  //    *  • When adding (`editIndex === null`) the count will grow by 1.
+  //    * ─────────────────────────────── */
+  //   const nextCount =
+  //     editIndex === null ? invoiceItems.length + 1 : invoiceItems.length;
+
+  //   if (nextCount > MAX_ITEMS) {
+  //     toast.error(
+  //       "❌ Cannot add more than 50 products. Please create a new bill."
+  //     );
+  //     return;
+  //   }
+
+  //   // Build the new array
+  //   const updatedItems =
+  //     editIndex !== null
+  //       ? invoiceItems.map((it, i) => (i === editIndex ? itemToAdd : it))
+  //       : [...invoiceItems, itemToAdd];
+
+  //   // Compute offset and update state
+  //   const offset = 385 + updatedItems.length * 55;
+  //   toast.success(`✅ Item added successfully! ${offset}`);
+
+  //   setInvoiceItems(updatedItems);
+  //   setEditIndex(null);
+  //   setAvailableQty(currentItem.qty);
+  //   setProductType(selectedItem.productType);
+  //   setCurrentItem({ name: "", qty: "", rate: "", hsn: "", tax: "", mrp: "" });
+  // };
+
   const handleAddItem = () => {
     if (!currentItem.name || !currentItem.qty || !currentItem.rate) return;
 
     const selectedItem = itemOptions.find(
       (item) => item.name === currentItem.name
     );
-    console.log("Selected item:", selectedItem);
-    console.log("Selected productType:", selectedItem.productType);
 
     const itemToAdd = {
       ...currentItem,
@@ -192,68 +251,33 @@ export default function CreatePurchasePage() {
       mrp: selectedItem?.mrp ?? null,
     };
 
-    // Instead of writing straight to invoiceItems, open modal first
+    // Save pending item + related product data
     setPendingItem(itemToAdd);
-    setBatchModalOpen(true);
-
-    // Duplicate‑name guard (ignore if we’re just editing the same row)
-    const isDuplicate = invoiceItems.some(
-      (item, index) => item.name === itemToAdd.name && index !== editIndex
-    );
-    if (isDuplicate) {
-      toast.error("❌ Item already added!");
-      return;
-    }
-
-    /** ───────────────────────────────
-     * NEW: enforce the 50‑item limit
-     *  • When editing (`editIndex !== null`) the count doesn’t change.
-     *  • When adding (`editIndex === null`) the count will grow by 1.
-     * ─────────────────────────────── */
-    const nextCount =
-      editIndex === null ? invoiceItems.length + 1 : invoiceItems.length;
-
-    if (nextCount > MAX_ITEMS) {
-      toast.error(
-        "❌ Cannot add more than 50 products. Please create a new bill."
-      );
-      return;
-    }
-
-    // Build the new array
-    const updatedItems =
-      editIndex !== null
-        ? invoiceItems.map((it, i) => (i === editIndex ? itemToAdd : it))
-        : [...invoiceItems, itemToAdd];
-
-    // Compute offset and update state
-    const offset = 385 + updatedItems.length * 55;
-    toast.success(`✅ Item added successfully! ${offset}`);
-
-    setInvoiceItems(updatedItems);
-    setEditIndex(null);
+    setProductType(selectedItem?.productType);
     setAvailableQty(currentItem.qty);
-    setProductType(selectedItem.productType);
-    setCurrentItem({ name: "", qty: "", rate: "", hsn: "", tax: "", mrp: "" });
+    setBatchData([]); // clear old batch entries
+    setBatchModalOpen(true); // open modal
+
+    // Don't proceed now — wait for modal confirmation
   };
 
- const handleAddBatch = () => {
-  batchForm.validateFields().then((values) => {
-    setBatchData((prev) => [
-      ...prev,
-      {
-        ...values,
-        mfgDate: mfgDate ? dayjs(mfgDate).format("DD-MM-YYYY") : "",
-        expiryDate: expiryDate ? dayjs(expiryDate).format("DD-MM-YYYY") : "",
-        key: Date.now(),
-      },
-    ]);
+  const handleAddBatch = () => {
+    batchForm.validateFields().then((values) => {
+      setBatchData((prev) => [
+        ...prev,
+        {
+          ...values,
+          mfgDate: mfgDate ? dayjs(mfgDate).format("DD-MM-YYYY") : "",
+          expiryDate: expiryDate ? dayjs(expiryDate).format("DD-MM-YYYY") : "",
+          key: Date.now(),
+        },
+      ]);
 
-    batchForm.resetFields();
-    setMfgDate(null); // clear selected dates
-    setExpiryDate(null);
-  });
-};
+      batchForm.resetFields();
+      setMfgDate(null); // clear selected dates
+      setExpiryDate(null);
+    });
+  };
   const handleCancel = () => {
     batchForm.resetFields();
     setBatchData([]);
@@ -753,7 +777,11 @@ export default function CreatePurchasePage() {
                 className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-400 focus:outline-none"
                 value={currentItem.qty}
                 onChange={(e) =>
-                  setCurrentItem({ ...currentItem, qty: e.target.value })
+                  setCurrentItem({
+                    ...currentItem,
+                    qty:
+                      e.target.value === "" ? "" : parseInt(e.target.value, 10),
+                  })
                 }
               />
             </div>
@@ -979,7 +1007,21 @@ export default function CreatePurchasePage() {
               {invoiceItems.map((item, index) => (
                 <tr key={index} className="invoice-item hover:bg-gray-50">
                   <td className="border p-3">{index + 1}</td>
-                  <td className="border p-3">{item.name}</td>
+                  <td className="border p-3">
+                    <div className="font-semibold">{item.name}</div>
+
+                    {/* Show batch details if present */}
+                    {item.batches && item.batches.length > 0 && (
+                      <ul className="mt-1 text-xs text-gray-600 list-disc list-inside space-y-0.5">
+                        {item.batches.map((batch, i) => (
+                          <li key={i}>
+                            Batch: {batch.batchNo ?? "N/A"}, Exp:{" "}
+                            {batch.expiryDate ?? "N/A"} ({batch.quantity})
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </td>
                   <td className="border p-3">{item.hsn}</td>
                   <td className="border p-3">{item.tax}%</td>
                   <td className="border p-3">{item.mrp ?? "N/A"}</td>
@@ -1290,6 +1332,22 @@ export default function CreatePurchasePage() {
                 }}
               >
                 {item.name}
+                {batchData?.length > 0 && (
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      color: "#555",
+                      marginTop: "2px",
+                    }}
+                  >
+                    {batchData.map((batch, i) => (
+                      <div key={i}>
+                        (Batch: {batch.batchNo || batch.serialNo || "N/A"}, Exp:{" "}
+                        {batch.expiryDate || "N/A"} ({batch.quantity || 0}))
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div
                 style={{
@@ -1626,21 +1684,51 @@ export default function CreatePurchasePage() {
         open={batchModalOpen}
         onCancel={handleCancel}
         onOk={() => {
-          const values = batchForm.getFieldsValue();
-          const formatted = {
-            ...values,
-            mfgDate: mfgDate ? dayjs(mfgDate).format("DD-MM-YYYY") : "",
-            expiryDate: expiryDate
-              ? dayjs(expiryDate).format("DD-MM-YYYY")
-              : "",
+          // Enforce basic checks
+          if (!batchData.length) {
+            toast.error("❌ Please add at least one batch entry.");
+            return;
+          }
+
+          const isDuplicate = invoiceItems.some(
+            (item) => item.name === pendingItem.name
+          );
+          if (isDuplicate) {
+            toast.error("❌ Item already added!");
+            return;
+          }
+
+          const nextCount = invoiceItems.length + 1;
+          if (nextCount > MAX_ITEMS) {
+            toast.error(
+              "❌ Cannot add more than 50 products. Please create a new bill."
+            );
+            return;
+          }
+
+          // Final item object with batch data
+          const fullItem = {
+            ...pendingItem,
+            batches: batchData,
           };
-          setBatchData((prev) => [...prev, formatted]);
+
+          setInvoiceItems((prev) => [...prev, fullItem]);
+          toast.success("✅ Item added successfully!");
+
+          // Cleanup
+          setCurrentItem({
+            name: "",
+            qty: "",
+            rate: "",
+            hsn: "",
+            tax: "",
+            mrp: "",
+          });
+          setPendingItem(null);
           setBatchModalOpen(false);
-          batchForm.resetFields();
-          setMfgDate(null);
-          setExpiryDate(null);
+          setBatchData([]);
         }}
-        okText="Add"
+        okText="Confirm Item"
       >
         <Form form={batchForm} layout="vertical" autoComplete="off">
           <Form.Item>
@@ -1658,7 +1746,7 @@ export default function CreatePurchasePage() {
             </Form.Item>
           )}
 
-          <Form.Item
+          {/* <Form.Item
             label="Mfg Date"
             required
             validateStatus={!mfgDate ? "error" : ""}
@@ -1671,13 +1759,17 @@ export default function CreatePurchasePage() {
               dateFormat="dd-MM-yyyy"
               className="ant-input"
             />
-          </Form.Item>
+          </Form.Item> */}
 
           <Form.Item
+            name="expiryDate"
             label="Expiry Date"
-            required
-            validateStatus={!expiryDate ? "error" : ""}
-            help={!expiryDate ? "Please select expiry date" : ""}
+            rules={[
+              {
+                required: true,
+                message: "Please select expiry date",
+              },
+            ]}
           >
             <DatePicker
               selected={expiryDate}
